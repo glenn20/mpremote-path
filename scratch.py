@@ -1,9 +1,8 @@
 # %%
-
+# pyright: reportUnusedExpression=false
 from mpremote.transport_serial import SerialTransport
 
-from board import Board, Debug
-from remote_path import RemotePath
+from src.mpremote_path import Board, Debug, RemotePath
 
 RemotePath.board = Board(SerialTransport("/dev/ttyUSB0"))
 board = RemotePath.board

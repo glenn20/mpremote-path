@@ -46,7 +46,7 @@ class Board:
 
     def writer(self, b: bytes) -> None:
         """The writer function used by the mpremote SerialTransport instance."""
-        print(b.decode())
+        print(b.decode(), end="")
 
     @contextmanager
     def raw_repl(self, message: Any = "") -> Generator[SerialTransport, None, None]:

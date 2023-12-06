@@ -4,8 +4,11 @@ PyBoardExtended interface to a micropython board (from the mpremote tool).
 # Copyright (c) 2021 @glenn20
 # MIT License
 
+
 # For python<3.10: Allow method type annotations to reference enclosing class
 from __future__ import annotations
+
+__version__ = "0.0.1"
 
 import os
 import stat
@@ -14,7 +17,7 @@ from functools import lru_cache
 from pathlib import Path, PosixPath
 from typing import Generator, Iterable, Iterator
 
-from board import Board
+from .board import Board
 
 
 class RemoteDirEntry:
