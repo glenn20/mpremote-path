@@ -1,18 +1,24 @@
 # %%
 # pyright: reportUnusedExpression=false
-from mpremote.transport_serial import SerialTransport
+import itertools
+import os
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Generator, Iterable
 
-from src.mpremote_path import Board, Debug, RemotePath
+from mpremote.transport_serial import SerialTransport
+from mpremote_path import Board, Debug, RemotePath
 
 RemotePath.board = Board(SerialTransport("/dev/ttyUSB0"))
 board = RemotePath.board
 board.debug = Debug.EXEC
+board.soft_reset()
 p = RemotePath("main.py", board=board)
 d = RemotePath("/", board=board)
 dot = RemotePath(".")
 
 print(repr(p))
-(p.stat(), p.is_dir(), p.is_file())
+(d.stat(), d.is_dir(), d.is_file())
 
 # %%
 p.cwd(), p.home()
@@ -51,5 +57,101 @@ q, q.absolute(), q.absolute().resolve()
 missing = RemotePath("missing.txt")
 assert missing.exists() is False
 missing.exists()
+
+
+# %%
+@contextmanager
+def folder(name: str) -> Generator[RemotePath, None, None]:
+    pwd, d = None, None
+    try:
+        pwd = RemotePath.cwd()
+        d = RemotePath(name)
+        d.mkdir()
+        d.cd()
+        yield d
+    finally:
+        if pwd:
+            pwd.cd()
+        if d:
+            d.rmdir()
+
+
+def copy_recursive(src: Path, dst: Path) -> None:
+    """Copy a file or directory recursively."""
+    if src.is_dir():
+        print(f"{src}/ -> {dst}/")
+        dst.mkdir()
+        for child in src.iterdir():
+            copy_recursive(child, dst / child.name)
+    elif src.is_file():
+        print(f"{src} -> {dst}")
+        dst.write_bytes(src.read_bytes())
+    else:
+        print(f"Skipping {src}")
+
+
+def ls_dir(path: Path) -> Iterable[Path]:
+    """List a file or directory recursively."""
+    if path.is_dir():
+        return itertools.chain(
+            (child for child in path.iterdir()),
+            itertools.chain.from_iterable(
+                ls_dir(child) for child in path.iterdir() if child.is_dir()
+            ),
+        )
+    raise ValueError(f"{path} is not a directory")
+
+
+def rm_recursive(path: Path) -> None:
+    if not path.exists():
+        return
+    elif path.is_dir():
+        for child in path.iterdir():
+            rm_recursive(child)
+        print(f"{path}")
+        path.rmdir()
+    elif path.is_file():
+        print(f"{path}")
+        path.unlink()
+    else:
+        raise ValueError(f"{path} is not a directory or file")
+
+
+# %%
+p = RemotePath("/_test")
+if not p.exists():
+    p.mkdir()
+p.cd()
+if Path.cwd().name != "_test_data":
+    os.chdir("_test_data")
+
+
+# %%
+src = Path("./lib")
+dest = RemotePath("./lib")
+copy_recursive(src, dest)
+local = sorted([f for f in ls_dir(src) if f.is_file()])
+files = sorted([f for f in ls_dir(dest) if f.is_file()])
+
+# %%
+ls_local = sorted([f.as_posix() for f in local])
+ls_dest = sorted([f.as_posix() for f in files])
+print(ls_local, ls_dest)
+assert ls_local == ls_dest
+print([f.stat().st_size for f in local], [f.stat().st_size for f in files])
+assert [f.stat().st_size for f in local] == [f.stat().st_size for f in files]
+for src, dst in zip(local, files):
+    print(src.as_posix())
+    assert src.read_bytes() == dst.read_bytes()
+
+# %%
+p.parent.cd()
+rm_recursive(p)
+assert p.exists() is False
+
+# %%
+p = RemotePath("/_test").resolve()
+q = Path("_test_data")
+list(p.rglob("*.py"))
 
 # %%
