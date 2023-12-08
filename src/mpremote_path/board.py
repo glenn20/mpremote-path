@@ -80,6 +80,10 @@ class Board:
                 self._transport.exit_raw_repl()
                 self._transport.read_until(4, b">>> ")
 
+    def soft_reset(self):
+        self._transport.enter_raw_repl(soft_reset=True)
+        self._transport.exit_raw_repl()
+
     # Methods to execute stuff in the raw_repl on the micropython board
     def exec(self, code: bytes | str) -> str:
         """Execute `code` on the micropython board and return the output as a
