@@ -67,7 +67,7 @@ class RemotePath(PosixPath):
     board: Board
     _stat: os.stat_result | None
 
-    def __new__(cls, *args, **kwargs) -> Path:
+    def __new__(cls, *args, **kwargs) -> RemotePath:
         if not cls.board:
             raise ValueError("RemotePath.board must be set before use.")
         self = cls._from_parts(args)  # type: ignore
@@ -86,24 +86,19 @@ class RemotePath(PosixPath):
         )
 
     @classmethod
-    def cwd(cls) -> Path:
+    def cwd(cls) -> RemotePath:
         if not cls.board:
             raise ValueError("RemotePath.board must be set before use.")
         return cls(cls.board.eval("os.getcwd()"))
 
     @classmethod
-    def home(cls) -> Path:
+    def home(cls) -> RemotePath:
         return cls("/")
-
-    def cd(self) -> Path:
-        p = self.resolve()
-        self.board.exec(f"os.chdir({p.as_posix()!r})")
-        return p
 
     def samefile(self, other: Path | str) -> bool:
         raise NotImplementedError
 
-    def iterdir(self) -> Iterator[Path]:
+    def iterdir(self) -> Iterator[RemotePath]:
         for name in self.board.eval(f"os.listdir({str(self)!r})"):
             yield self._make_child_relpath(name)  # type: ignore
 
@@ -128,9 +123,9 @@ class RemotePath(PosixPath):
         finally:
             pass
 
-    def resolve(self, strict: bool = False) -> Path:
-        # The board has no concept of symlinks, so just eliminate ".." and "."
-        # from the absolute path.
+    def resolve(self, strict: bool = False) -> RemotePath:
+        # The fs on the board has no concept of symlinks, so just eliminate ".."
+        # and "." from the absolute path.
         parts = self._parts if self.is_absolute() else ([self.cwd()] + self._parts)  # type: ignore
         new_parts = []
         for p in parts:
@@ -205,7 +200,7 @@ class RemotePath(PosixPath):
     def lstat(self) -> os.stat_result:
         return self.stat()
 
-    def rename(self, target: RemotePath | str) -> Path:
+    def rename(self, target: RemotePath | str) -> RemotePath:
         self._stat = None
         self.board.exec(f"os.rename({self.as_posix()!r},{str(target)!r})")
         return self.__class__(str(target))
@@ -256,4 +251,17 @@ class RemotePath(PosixPath):
         return False
 
     def expanduser(self) -> RemotePath:
-        return self
+        return (
+            self._from_parts(["/"] + self._parts[1:])  # type: ignore
+            if (not (self._drv or self._root) and self._parts[:1] == ["~"])  # type: ignore
+            else self
+        )
+
+    # Additional convenience methods for RemotePath
+    def cd(self) -> RemotePath:
+        "Set the current working directory on the board to this path." ""
+        p = self.resolve()
+        self.board.exec(f"os.chdir({p.as_posix()!r})")
+        return p
+
+    # def sha256sum(self) -> str:
