@@ -188,4 +188,3 @@ tests/test_recursive_copy.py::test_recursive_rm PASSED                   [100%]
   - *Will raise a `NotImplemented` exception*:
     - `chmod()`, `lchmod()`, `open()`, `read_link()`, `replace()`,
       `samefile(other)`, `symlimk_to(target)`, `hardlink_to(target)`
-
