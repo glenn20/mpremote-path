@@ -4,8 +4,9 @@ from pathlib import Path
 from typing import Generator
 
 import pytest
-from mpremote.transport_serial import SerialTransport, TransportError
-from mpremote_path import Board, RemotePath
+from mpremote.transport_serial import TransportError
+
+from mpremote_path import MPRemotePath as MPath
 
 test_dir = "/_tests"
 data_dir = "tests/_data"
@@ -43,35 +44,35 @@ def rm_recursive(path: Path) -> None:
 
 
 @pytest.fixture()
-def root(pytestconfig) -> Generator[RemotePath, None, None]:
-    if not hasattr(RemotePath, "board"):
-        RemotePath.board = Board(
-            SerialTransport(pytestconfig.option.port, pytestconfig.option.baud)
-        )
-        RemotePath.board.soft_reset()
-        rm_recursive(RemotePath(test_dir))  # Clean up after previous test runs
-    path, pwd = RemotePath("/"), RemotePath.cwd()
-    path.cd()
+def root(pytestconfig) -> Generator[MPath, None, None]:
+    if not hasattr(MPath, "board"):
+        MPath.connect(pytestconfig.option.port, pytestconfig.option.baud)
+        MPath.board.soft_reset()
+        rm_recursive(MPath(test_dir))  # Clean up after previous test runs
+    path, pwd = MPath("/"), MPath.cwd()
+    path.chdir()
     yield path
-    pwd.cd()
+    pwd.chdir()
 
 
 @pytest.fixture()
 def testdir(root):
-    return RemotePath(test_dir)
+    path, pwd = MPath(test_dir), MPath.cwd()
+    yield path
+    if pwd:  # Restore the previous working directory and cleanup
+        pwd.chdir()
 
 
 @pytest.fixture()
-def testfolder(root: RemotePath) -> Generator[RemotePath, None, None]:
+def testfolder(root: MPath) -> Generator[MPath, None, None]:
     "Create a test folder on the board and cd into it."
-    path = RemotePath(test_dir)
-    pwd = RemotePath.cwd()
+    path, pwd = MPath(test_dir), MPath.cwd()
     with suppress(TransportError, OSError):
         path.mkdir()
-    path.cd()
+    path.chdir()
     yield path
     if pwd:  # Restore the previous working directory and cleanup
-        pwd.cd()
+        pwd.chdir()
     with suppress(TransportError, OSError):
         path.rmdir()
 

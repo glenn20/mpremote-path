@@ -1,6 +1,7 @@
 # For python<3.10: Allow method type annotations to reference enclosing class
 from __future__ import annotations
 
+import re
 import sys
 from contextlib import contextmanager
 from enum import IntFlag
@@ -19,6 +20,35 @@ def my_stdout_write_bytes(b: bytes):
 # Override the mpremote stdout writer which fails if stdout does not have a
 # .buffer() method (eg. when running in a jupyter notebook)
 mpremote.transport_serial.stdout_write_bytes = my_stdout_write_bytes
+
+
+def make_transport(
+    device: str, baudrate: int = 115200, wait: int = 0
+) -> SerialTransport:
+    """Create a `SerialTransport` instance on the given serial port."""
+    port: str = device
+    port = re.sub(r"^u([0-9]+)$", r"/dev/ttyUSB\1", port)
+    port = re.sub(r"^a([0-9]+)$", r"/dev/ttyACM\1", port)
+    port = re.sub(r"^c([0-9]+)$", r"COM\1", port)
+    dev = port
+    dev = re.sub(r"^/dev/ttyUSB([0-9]+)$", r"u\1", dev)
+    dev = re.sub(r"^/dev/ttyACM([0-9]+)$", r"a\1", dev)
+    dev = re.sub(r"^/COM([0-9]+)$", r"c\1", dev)
+    return SerialTransport(port, baudrate, wait)
+
+
+def make_board(
+    port: str | Board | SerialTransport, baud: int = 115200, wait: int = 0
+) -> Board:
+    """Return a `Board` instance from a serial port name or a `SerialTransport`
+    object or an existing `Board` instance."""
+    return (
+        port
+        if isinstance(port, Board)
+        else Board(port)
+        if isinstance(port, SerialTransport)
+        else Board(make_transport(port, baud, wait))
+    )
 
 
 class Debug(IntFlag):

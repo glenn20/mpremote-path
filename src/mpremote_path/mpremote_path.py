@@ -17,26 +17,28 @@ from functools import lru_cache
 from pathlib import Path, PosixPath
 from typing import Generator, Iterable, Iterator
 
-from .board import Board
+from mpremote.transport_serial import SerialTransport
+
+from .board import Board, make_board
 
 
-class RemoteDirEntry:
-    """A duck-typed version of `os.DirEntry` for use with `RemotePath`.
+class MPRemoteDirEntry:
+    """A duck-typed version of `os.DirEntry` for use with `MPRemotePath`.
 
     Will be initialised from the results of calling `os.ilistdir()` on the
     micropython board. This is used to support the `_scandir()`, `glob()` and
-    `rglob()` methods of `RemotePath`."""
+    `rglob()` methods of `MPRemotePath`."""
 
     def __init__(self, path: str, mode: int = 0, inode: int = 0, size: int = 0) -> None:
         self.path: str = path
         self._mode: int = mode
-        self._inode: int = hash(self.path)
+        self._inode: int = inode
         self._size: int = size
         self._stat: os.stat_result | None = None
 
     @property
     def name(self) -> str:
-        return self.path.split("/")[-1]
+        return self.path[self.path.rfind("/") + 1 :]
 
     def inode(self) -> int:
         return self._inode
@@ -52,31 +54,57 @@ class RemoteDirEntry:
 
     def stat(self, *, follow_symlinks: bool = True) -> os.stat_result:
         if self._stat is None:
-            if not RemotePath.board:
+            if not MPRemotePath.board:
                 raise ValueError("RemotePath.board must be set before use.")
-            s = RemotePath.board.eval(f"os.stat({self.path!r})")
+            s = MPRemotePath.board.eval(f"os.stat({self.path!r})")
             self._stat = os.stat_result(s)
         return self._stat
 
 
 # Paths on the board are always Posix paths even if local host is Windows.
-class RemotePath(PosixPath):
+class MPRemotePath(PosixPath):
     "A `pathlib.Path` compatible class to hold details of files on the board."
     slots = ("_stat", "board")
-    epoch_offset: int = 0
     board: Board
     _stat: os.stat_result | None
+    _drv: str  # Declare types for properties inherited from pathlib classes
+    _root: str
+    _parts: list[str]
 
-    def __new__(cls, *args, **kwargs) -> RemotePath:
+    def __new__(cls, *args) -> MPRemotePath:
         if not cls.board:
-            raise ValueError("RemotePath.board must be set before use.")
+            raise ValueError("Must call MPRemotePath.connect() before use.")
         self = cls._from_parts(args)  # type: ignore
-        self.board = kwargs.get("board", self.__class__.board)
-        self._flavour.has_drv = True
+        self.board = self.__class__.board
         return self
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args) -> None:
         self._stat = None
+
+    # Additional convenience methods for MPRemotePath
+    def chdir(self) -> MPRemotePath:
+        "Set the current working directory on the board to this path." ""
+        p = self.resolve()
+        self.board.exec(f"os.chdir({p.as_posix()!r})")
+        return p
+
+    @classmethod
+    def connect(
+        cls,
+        port: str | Board | SerialTransport,
+        baud: int = 115200,
+        wait: int = 0,
+    ) -> None:
+        """Connect to the micropython board on the given `port`.
+        - `port` can be a `Board` instance, an mpremote `SerialTransport`
+          instance or a string containing the full or abbreviated name of the
+          serial port
+        - `baud` is the baud rate to use for the serial connection
+        - `wait` is the number of seconds to wait for the board to become
+          available.
+        `baud` and `wait` are only used if `port` is a string.
+        """
+        cls.board = make_board(port, baud, wait)
 
     def __repr__(self) -> str:
         return (
@@ -85,36 +113,37 @@ class RemotePath(PosixPath):
             else f"RemotePath({self.as_posix()!r})"
         )
 
+    # Overrides for pathlib.Path methods
     @classmethod
-    def cwd(cls) -> RemotePath:
+    def cwd(cls) -> MPRemotePath:
         if not cls.board:
             raise ValueError("RemotePath.board must be set before use.")
         return cls(cls.board.eval("os.getcwd()"))
 
     @classmethod
-    def home(cls) -> RemotePath:
+    def home(cls) -> MPRemotePath:
         return cls("/")
 
     def samefile(self, other: Path | str) -> bool:
         raise NotImplementedError
 
-    def iterdir(self) -> Iterator[RemotePath]:
+    def iterdir(self) -> Iterator[MPRemotePath]:
         for name in self.board.eval(f"os.listdir({str(self)!r})"):
             yield self._make_child_relpath(name)  # type: ignore
 
     # `rglob()` calls `_scandir()` twice in a row for each dir, so cache the
     # results from the board.
-    # !!! Fixme: replace with real caching.
+    # TODO: replace with real caching.
     @lru_cache(maxsize=1)
-    def _ilistdir(self) -> Iterable[RemoteDirEntry]:
-        """Return an iterable of `RemoteDirEntry` objects for the files in a
+    def _ilistdir(self) -> Iterable[MPRemoteDirEntry]:
+        """Return an iterable of `MPRemoteDirEntry` objects for the files in a
         directory on the micropython `board`."""
         ls = self.board.eval(f"list(os.ilistdir({self.as_posix()!r}))")
-        return [RemoteDirEntry(*f) for f in ls]
+        return [MPRemoteDirEntry(*f) for f in ls]
 
     # glob() and rglob() rely on _scandir()
     @contextmanager
-    def _scandir(self) -> Generator[Iterable[RemoteDirEntry], None, None]:
+    def _scandir(self) -> Generator[Iterable[MPRemoteDirEntry], None, None]:
         """A context manager which produces an iterable of information about the
         files in a folder on the micropython board. This is used by `glob()` and
         `rglob()`."""
@@ -123,10 +152,10 @@ class RemotePath(PosixPath):
         finally:
             pass
 
-    def resolve(self, strict: bool = False) -> RemotePath:
+    def resolve(self, strict: bool = False) -> MPRemotePath:
         # The fs on the board has no concept of symlinks, so just eliminate ".."
         # and "." from the absolute path.
-        parts = self._parts if self.is_absolute() else ([self.cwd()] + self._parts)  # type: ignore
+        parts = self._parts if self.is_absolute() else ([self.cwd()] + self._parts)
         new_parts = []
         for p in parts:
             if p == ".." and new_parts:
@@ -200,23 +229,23 @@ class RemotePath(PosixPath):
     def lstat(self) -> os.stat_result:
         return self.stat()
 
-    def rename(self, target: RemotePath | str) -> RemotePath:
+    def rename(self, target: MPRemotePath | str) -> MPRemotePath:
         self._stat = None
         self.board.exec(f"os.rename({self.as_posix()!r},{str(target)!r})")
         return self.__class__(str(target))
 
-    def replace(self, target: RemotePath | str) -> RemotePath:
+    def replace(self, target: MPRemotePath | str) -> MPRemotePath:
         raise NotImplementedError
 
     def symlink_to(
-        self, target: RemotePath | str, target_is_directory: bool = False
+        self, target: MPRemotePath | str, target_is_directory: bool = False
     ) -> None:
         raise NotImplementedError
 
-    def hardlink_to(self, target: RemotePath | str) -> None:
+    def hardlink_to(self, target: MPRemotePath | str) -> None:
         raise NotImplementedError
 
-    def link_to(self, target: RemotePath | str) -> None:
+    def link_to(self, target: MPRemotePath | str) -> None:
         raise NotImplementedError
 
     def exists(self) -> bool:
@@ -250,18 +279,9 @@ class RemotePath(PosixPath):
     def is_socket(self) -> bool:
         return False
 
-    def expanduser(self) -> RemotePath:
+    def expanduser(self) -> MPRemotePath:
         return (
             self._from_parts(["/"] + self._parts[1:])  # type: ignore
-            if (not (self._drv or self._root) and self._parts[:1] == ["~"])  # type: ignore
+            if (not (self._drv or self._root) and self._parts[:1] == ["~"])
             else self
         )
-
-    # Additional convenience methods for RemotePath
-    def cd(self) -> RemotePath:
-        "Set the current working directory on the board to this path." ""
-        p = self.resolve()
-        self.board.exec(f"os.chdir({p.as_posix()!r})")
-        return p
-
-    # def sha256sum(self) -> str:

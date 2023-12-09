@@ -7,15 +7,17 @@ from pathlib import Path
 from typing import Generator, Iterable
 
 from mpremote.transport_serial import SerialTransport
-from mpremote_path import Board, Debug, RemotePath
 
-RemotePath.board = Board(SerialTransport("/dev/ttyUSB0"))
-board = RemotePath.board
+from mpremote_path import Board, Debug
+from mpremote_path import MPRemotePath as MPath
+
+MPath.board = Board(SerialTransport("/dev/ttyUSB0"))
+board = MPath.board
 board.debug = Debug.EXEC
 board.soft_reset()
-p = RemotePath("main.py", board=board)
-d = RemotePath("/", board=board)
-dot = RemotePath(".")
+p = MPath("main.py", board=board)
+d = MPath("/", board=board)
+dot = MPath(".")
 
 print(repr(p))
 (d.stat(), d.is_dir(), d.is_file())
@@ -38,7 +40,7 @@ p.read_bytes()
 print(p.read_text())
 
 # %%
-p2 = RemotePath("crap.txt")
+p2 = MPath("crap.txt")
 msg = b"Hello world\n"
 p2.write_bytes(msg)
 p2.stat()
@@ -49,29 +51,29 @@ p2.unlink()
 "OK"
 
 # %%
-q = RemotePath("./lib/mpy")
+q = MPath("./lib/mpy")
 q = q / "../.././main.py"
 q, q.absolute(), q.absolute().resolve()
 
 # %%
-missing = RemotePath("missing.txt")
+missing = MPath("missing.txt")
 assert missing.exists() is False
 missing.exists()
 
 
 # %%
 @contextmanager
-def folder(name: str) -> Generator[RemotePath, None, None]:
+def folder(name: str) -> Generator[MPath, None, None]:
     pwd, d = None, None
     try:
-        pwd = RemotePath.cwd()
-        d = RemotePath(name)
+        pwd = MPath.cwd()
+        d = MPath(name)
         d.mkdir()
-        d.cd()
+        d.chdir()
         yield d
     finally:
         if pwd:
-            pwd.cd()
+            pwd.chdir()
         if d:
             d.rmdir()
 
@@ -118,17 +120,17 @@ def rm_recursive(path: Path) -> None:
 
 
 # %%
-p = RemotePath("/_test")
+p = MPath("/_test")
 if not p.exists():
     p.mkdir()
-p.cd()
+p.chdir()
 if Path.cwd().name != "_test_data":
     os.chdir("_test_data")
 
 
 # %%
 src = Path("./lib")
-dest = RemotePath("./lib")
+dest = MPath("./lib")
 copy_recursive(src, dest)
 local = sorted([f for f in ls_dir(src) if f.is_file()])
 files = sorted([f for f in ls_dir(dest) if f.is_file()])
@@ -145,12 +147,12 @@ for src, dst in zip(local, files):
     assert src.read_bytes() == dst.read_bytes()
 
 # %%
-p.parent.cd()
+p.parent.chdir()
 rm_recursive(p)
 assert p.exists() is False
 
 # %%
-p = RemotePath("/_test").resolve()
+p = MPath("/_test").resolve()
 q = Path("_test_data")
 list(p.rglob("*.py"))
 

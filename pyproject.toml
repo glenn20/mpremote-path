@@ -20,14 +20,8 @@ dynamic = ["dependencies", "version"]
 [tool.hatch.version]
 path = "src/mpremote_path/__init__.py"
 
-
 [tool.hatch.build.targets.wheel]
 packages = ["src/mpremote_path"]
 
 [tool.ruff]
 target-version = "py37"
-
-[tool.pytest.ini_options]
-addopts = [
-    "--import-mode=importlib",
-]
