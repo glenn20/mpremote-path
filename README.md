@@ -6,7 +6,7 @@ compatible interface to access and manipulate files on a serial-attached
 computer. **mpremote-path** is built on the file access features of the
 [mpremote](https://docs.micropython.org/en/latest/reference/mpremote.html) tool.
 
-**Contents: [Features](#features) | [Installation](#installation)**
+**Contents: [Features](#features) | [Installation](#installation) | [API Docs](#api-docs-mpremote_path-module)**
 
 ## Features
 
@@ -33,7 +33,7 @@ d.mkdir()                           # Create a new directory /data
 d.chdir()                           # Set the working directory to /data
 root.chdir()                        # Set the working directory to /
 d.rmdir()                           # Delete /data
-print(f for f in MPath("/lib").rglob("*.py"))  # Print all python files in subdirs of /lib
+print([str(f) for f in MPath("/lib").rglob("*.py")])  # Print name of all python files in subdirs of /lib
 ```
 
 - inherits from `PosixPath` class, so code which works on `Path` objects will
@@ -49,7 +49,7 @@ def rcopy(src: Path, dst: Path) -> None:
         print(f"{src}/ -> {dst}/")
         dst.mkdir()
         for child in src.iterdir():
-            rsync(child, dst / child.name)
+            rcopy(child, dst / child.name)
     elif src.is_file():
         print(f"{src} -> {dst}")
         dst.write_bytes(src.read_bytes())
@@ -92,7 +92,7 @@ To install in your python environment:
   pip install dist/mpremote-path*.whl
   ```
 
-Run the test suite (requires `pytest`):
+*Optional*: Run the test suite (requires pytest module: `pip install pytest`):
 
 - Warning: running these tests will create and delete files and subdirectories
 in a new folder on the micropython board: `/_tests`.
@@ -119,3 +119,73 @@ tests/test_recursive_copy.py::test_recursive_rm PASSED                   [100%]
 
 ============================= 11 passed in 27.68s ==============================
 ```
+
+## API docs: `mpremote_path` module
+
+### Class `MPRemotePath`
+
+- Class **`MPRemotePath(*pathsegments)`**
+
+  - Create an MPRemotePath instance representing the pathname for a file on a
+    micropython board. The file may or may not exist on the board and may be a
+    regular file or a directory. If the file does not exist, it can be created
+    with the `touch()`, `mkdir()`, `write_bytes()` or `write_text()` methods.
+
+    The file pathname is built up by concatenating the `pathsegments` provided
+    as arguments. The segments may be strings or `Path` objects (including
+    `MPRemotePath`). (See [`pathlib.Path`](
+    https://docs.python.org/3/library/pathlib.html#pathlib.Path))
+
+#### Additional methods
+
+- Classmethod: **`connect(port: str | Board | SerialTransport) -> None`**
+
+  - Establish a connection to the serial-attached micropython board. `port` may
+    be of type:
+    - `str`: the name of a serial port (full or abbreviated), eg:
+      `"/dev/ttyUSB0"` or `"u0"`,
+    - `SerialTransport`: the mpremote interface to the micropython board, or
+    - `mpremote_path.Board`: a wrapper for the `SerialTransport` interface.
+
+    This method must be called before any methods that attempt to interact with
+    the micropython board.
+
+- Method: **`chdir() -> MPRemotePath`**
+
+  - Set the working directory on the board to the path, which must be an
+    existing directory. This is provided as a convenience to simplify changing
+    the working directory on the board. Returns the new working directory as a
+    normalised absolute path. This is an `MPRemotePath`-only extension.
+
+#### Inherited Properties, Methods and Operators
+
+- From
+  [pathlib.PurePath](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath):
+
+  - *Properties*:
+    - `parts`, `drive`, `root`, `anchor`, `parents`, `parent`, `name`, `suffix`,
+      `suffixes`, `stem`
+  - *Methods*:
+    - `as_posix()`, `as_uri()`, `is_absolute()`, `is_relative_to(other)`,
+      `is_reserved()`, `joinpath(*pathsegments)`, `match(pattern)`,
+      `relative_to()`, `with_name(name)`, `with_stem(stem)`, `with_suffix()`,
+      `with_segments(*pathsegments)`
+  - *Operators*:
+    - `/`: the slash operator concatenates path segments to create child paths,
+      - eg. `lib = MPRemotePath("/lib); pkg_dir = lib / "pkg"`.
+
+- Inherits or overrides from
+  [pathlib.Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path):
+
+  - *Methods*:
+    - `cwd()`, `home()`, `stat()`, `exists()`, `expanduser()`, `glob(pattern)`,
+      `group()`, `is_dir()`, `is_file()`, `is_junction()`, `is_mount()`,
+      `is_symlink()`, `is_socket()`, `is_fifo()`, `is_block_device()`,
+      `is_char_device()`, `iterdir()`, `walk()`, `lstat()`, `mkdir()`,
+      `owner()`, `read_bytes()`, `read_text()`, `rename()`, `absolute()`,
+      `resolve()`, `rglob(pattern)`, `rmdir()`, `touch()`, `unlink()`,
+      `write_bytes(data)`, `write_text(text)`
+  - *Will raise a `NotImplemented` exception*:
+    - `chmod()`, `lchmod()`, `open()`, `read_link()`, `replace()`,
+      `samefile(other)`, `symlimk_to(target)`, `hardlink_to(target)`
+

@@ -108,9 +108,9 @@ class MPRemotePath(PosixPath):
 
     def __repr__(self) -> str:
         return (
-            f"RemotePath({self.as_posix()!r},stat={self._stat})"
+            f"{self.__class__.__name__}({self.as_posix()!r},stat={self._stat})"
             if hasattr(self, "_stat")
-            else f"RemotePath({self.as_posix()!r})"
+            else f"{self.__class__.__name__}({self.as_posix()!r})"
         )
 
     # Overrides for pathlib.Path methods
