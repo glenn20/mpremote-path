@@ -116,7 +116,7 @@ def test_read_write_text(testfolder: MPath) -> None:
     assert p.exists() is False
 
 
-def test_resolve(root) -> None:
+def test_resolve_samefile(root) -> None:
     "Test resolving paths: absolute(), and resolve()"
     q = MPath("./lib/mpy")
     q = q / "../.././main.py"
@@ -129,6 +129,8 @@ def test_resolve(root) -> None:
         "/lib/mpy/../../main.py",
         "/main.py",
     )
+    assert q.samefile(q.absolute()) is True
+    assert q.samefile(q.absolute().resolve()) is True
 
 
 def test_not_implemented(testfolder: MPath) -> None:
@@ -137,8 +139,6 @@ def test_not_implemented(testfolder: MPath) -> None:
     assert p.exists() is False
     p.touch()  # Create a temp file for the following tests
     assert p.exists() is True
-    with pytest.raises(NotImplementedError):
-        p.samefile("test1.touch")  # TODO: implement this (dont have inodes)
     with pytest.raises(NotImplementedError):
         p.chmod(0o777)  # No groups or other permissions on lfs or fat
     with pytest.raises(NotImplementedError):

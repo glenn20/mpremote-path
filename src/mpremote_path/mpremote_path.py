@@ -130,7 +130,8 @@ class MPRemotePath(PosixPath):
         return cls("/")
 
     def samefile(self, other: Path | str) -> bool:
-        raise NotImplementedError
+        other = mpremotepath(other)
+        return self.resolve() == other.resolve()
 
     def iterdir(self) -> Iterator[MPRemotePath]:
         for name in self.board.eval(f"os.listdir({str(self)!r})"):
