@@ -1,6 +1,8 @@
 import stat
+from shutil import SameFileError
 
 import pytest
+
 from mpremote_path import MPRemotePath as MPath
 
 # The `root` fixture saves the current working directory, cd's to the root
@@ -131,6 +133,27 @@ def test_resolve_samefile(root) -> None:
     )
     assert q.samefile(q.absolute()) is True
     assert q.samefile(q.absolute().resolve()) is True
+
+
+def test_copy_copyfile(testfolder: MPath) -> None:
+    "Test copying files"
+    p = MPath("test1.touch")
+    assert p.exists() is False
+    msg = "Hello world\n"
+    p.write_text(msg)
+    assert p.is_file() is True
+    q = p.copyfile("test2.touch")
+    assert q.read_text() == msg
+    q.unlink()
+    d1 = testfolder / "dir1"
+    d1.mkdir()
+    q = p.copy(d1)
+    assert str(q) == str(d1 / "test1.touch")
+    assert q.read_text() == msg
+    q.unlink()
+    with pytest.raises(SameFileError):
+        q = p.copy(testfolder)
+    p.unlink()
 
 
 def test_not_implemented(testfolder: MPath) -> None:

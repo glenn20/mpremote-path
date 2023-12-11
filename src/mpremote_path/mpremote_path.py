@@ -93,12 +93,18 @@ class MPRemotePath(PosixPath):
         self.board.exec(f"os.chdir({p.as_posix()!r})")
         return p
 
-    def copy(self, target: MPRemotePath | str) -> MPRemotePath:
+    def copyfile(self, target: MPRemotePath | str) -> MPRemotePath:
         target = mpremotepath(target)
-        target = target / self.name if target.is_dir() else target
+        if self.samefile(target):
+            raise SameFileError(f"{self!s} and {target!s} are the same file")
         with self.board.raw_repl() as r:
             r.fs_cp(str(self), str(target))
         return target
+
+    def copy(self, target: MPRemotePath | str) -> MPRemotePath:
+        target = mpremotepath(target)
+        target = target / self.name if target.is_dir() else target
+        return self.copyfile(target)
 
     @classmethod
     def connect(
