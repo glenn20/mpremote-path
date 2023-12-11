@@ -106,13 +106,6 @@ class MPRemotePath(PosixPath):
         """
         cls.board = make_board(port, baud, wait)
 
-    def __repr__(self) -> str:
-        return (
-            f"{self.__class__.__name__}({self.as_posix()!r},stat={self._stat})"
-            if hasattr(self, "_stat")
-            else f"{self.__class__.__name__}({self.as_posix()!r})"
-        )
-
     # Overrides for pathlib.Path methods
     @classmethod
     def cwd(cls) -> MPRemotePath:
