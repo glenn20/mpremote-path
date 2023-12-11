@@ -225,10 +225,14 @@ class MPRemotePath(PosixPath):
     def rename(self, target: MPRemotePath | str) -> MPRemotePath:
         self._stat = None
         self.board.exec(f"os.rename({self.as_posix()!r},{str(target)!r})")
-        return self.__class__(str(target))
+        if isinstance(target, MPRemotePath):
+            target._stat = None
+            return target
+        else:
+            return self.__class__(str(target))
 
     def replace(self, target: MPRemotePath | str) -> MPRemotePath:
-        raise NotImplementedError
+        return self.rename(target)
 
     def symlink_to(
         self, target: MPRemotePath | str, target_is_directory: bool = False

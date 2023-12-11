@@ -74,6 +74,21 @@ def test_touch_unlink(testfolder: MPath) -> None:
     assert p.exists() is False
 
 
+def test_rename_replace(testfolder: MPath) -> None:
+    "Test renaming files"
+    p = MPath("test1.touch")
+    p.touch()
+    assert p.exists() and p.is_file()
+    q = p.rename("test2.touch")
+    assert q.exists() and q.is_file()
+    assert p.exists() is False
+    p = q.replace("test3.touch")
+    assert p.exists() and p.is_file()
+    assert q.exists() is False
+    p.unlink()
+    assert p.exists() is False
+
+
 def test_read_write_bytes(testfolder: MPath) -> None:
     "Test reading and writing bytes to/from files"
     p = MPath("test1.bytes")
@@ -124,8 +139,6 @@ def test_not_implemented(testfolder: MPath) -> None:
     assert p.exists() is True
     with pytest.raises(NotImplementedError):
         p.samefile("test1.touch")  # TODO: implement this (dont have inodes)
-    with pytest.raises(NotImplementedError):
-        p.replace("test2.touch")  # TODO: implement this
     with pytest.raises(NotImplementedError):
         p.chmod(0o777)  # No groups or other permissions on lfs or fat
     with pytest.raises(NotImplementedError):
