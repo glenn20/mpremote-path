@@ -8,6 +8,8 @@ PyBoardExtended interface to a micropython board (from the mpremote tool).
 # For python<3.10: Allow method type annotations to reference enclosing class
 from __future__ import annotations
 
+from shutil import SameFileError
+
 __version__ = "0.0.1"
 
 import os
@@ -90,7 +92,7 @@ class MPRemotePath(PosixPath):
     def chdir(self) -> MPRemotePath:
         "Set the current working directory on the board to this path." ""
         p = self.resolve()
-        self.board.exec(f"os.chdir({p.as_posix()!r})")
+        self.board.exec(f"os.chdir({str(p)!r})")
         return p
 
     def copyfile(self, target: MPRemotePath | str) -> MPRemotePath:
@@ -150,7 +152,7 @@ class MPRemotePath(PosixPath):
     def _ilistdir(self) -> Iterable[MPRemoteDirEntry]:
         """Return an iterable of `MPRemoteDirEntry` objects for the files in a
         directory on the micropython `board`."""
-        ls = self.board.eval(f"list(os.ilistdir({self.as_posix()!r}))")
+        ls = self.board.eval(f"list(os.ilistdir({str(self)!r}))")
         return [MPRemoteDirEntry(*f) for f in ls]
 
     # glob() and rglob() rely on _scandir()
@@ -174,15 +176,16 @@ class MPRemotePath(PosixPath):
                 new_parts.pop()
             elif p != ".":
                 new_parts.append(p)
-        return self._from_parts(new_parts) if new_parts != parts else self  # type: ignore
+        p = self._from_parts(new_parts)  # type: ignore
+        return p if p._parts != self._parts else self
 
     def stat(self) -> os.stat_result:
         if hasattr(self, "_stat") and self._stat is not None:
             return self._stat
         with self.board.raw_repl() as r:
-            self._stat = r.fs_stat(self.as_posix())
+            self._stat = r.fs_stat(str(self))
         if self._stat is None:
-            raise FileNotFoundError(f"No such file or directory: {self.as_posix()!r}")
+            raise FileNotFoundError(f"No such file or directory: {str(self)!r}")
         return self._stat
 
     def owner(self) -> str:
@@ -196,7 +199,7 @@ class MPRemotePath(PosixPath):
 
     def read_bytes(self) -> bytes:
         with self.board.raw_repl() as r:
-            return r.fs_readfile(self.as_posix())
+            return r.fs_readfile(str(self))
 
     def read_text(self, encoding=None, errors=None) -> str:
         return self.read_bytes().decode(encoding or "utf-8", errors or "strict")
@@ -204,7 +207,7 @@ class MPRemotePath(PosixPath):
     def write_bytes(self, data: bytes) -> None:
         self._stat = None
         with self.board.raw_repl() as r:
-            r.fs_writefile(self.as_posix(), data)
+            r.fs_writefile(str(self), data)
 
     def write_text(self, data, encoding=None, errors=None, newline=None):
         return self.write_bytes(data.encode(encoding or "utf-8", errors or "strict"))
@@ -215,12 +218,12 @@ class MPRemotePath(PosixPath):
     def touch(self, mode=0o666, exist_ok=True) -> None:
         self._stat = None
         with self.board.raw_repl() as r:
-            r.fs_touch(self.as_posix())
+            r.fs_touch(str(self))
 
     def mkdir(self, mode=0o777, parents=False, exist_ok=False) -> None:
         self._stat = None
         with self.board.raw_repl() as r:
-            r.fs_mkdir(self.as_posix())
+            r.fs_mkdir(str(self))
 
     def chmod(self, mode: int, *, follow_symlinks=True) -> None:
         raise NotImplementedError
@@ -231,19 +234,19 @@ class MPRemotePath(PosixPath):
     def unlink(self, missing_ok=False) -> None:
         self._stat = None
         with self.board.raw_repl() as r:
-            r.fs_rm(self.as_posix())
+            r.fs_rm(str(self))
 
     def rmdir(self) -> None:
         self._stat = None
         with self.board.raw_repl() as r:
-            r.fs_rmdir(self.as_posix())
+            r.fs_rmdir(str(self))
 
     def lstat(self) -> os.stat_result:
         return self.stat()
 
     def rename(self, target: MPRemotePath | str) -> MPRemotePath:
         self._stat = None
-        self.board.exec(f"os.rename({self.as_posix()!r},{str(target)!r})")
+        self.board.exec(f"os.rename({str(self)!r},{str(target)!r})")
         target = mpremotepath(target)
         target._stat = None
         return target
