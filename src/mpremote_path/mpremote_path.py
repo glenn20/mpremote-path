@@ -15,11 +15,15 @@ import stat
 from contextlib import contextmanager
 from functools import lru_cache
 from pathlib import Path, PosixPath
-from typing import Generator, Iterable, Iterator
+from typing import Any, Generator, Iterable, Iterator
 
 from mpremote.transport_serial import SerialTransport
 
 from .board import Board, make_board
+
+
+def mpremotepath(f: Any) -> MPRemotePath:
+    return f if isinstance(f, MPRemotePath) else MPRemotePath(str(f))
 
 
 class MPRemoteDirEntry:
@@ -64,8 +68,9 @@ class MPRemoteDirEntry:
 # Paths on the board are always Posix paths even if local host is Windows.
 class MPRemotePath(PosixPath):
     "A `pathlib.Path` compatible class to hold details of files on the board."
-    slots = ("_stat", "board")
+    slots = ("_stat", "board", "epoch_offset")
     board: Board
+    epoch_offset: int
     _stat: os.stat_result | None
     _drv: str  # Declare types for properties inherited from pathlib classes
     _root: str
@@ -87,6 +92,13 @@ class MPRemotePath(PosixPath):
         p = self.resolve()
         self.board.exec(f"os.chdir({p.as_posix()!r})")
         return p
+
+    def copy(self, target: MPRemotePath | str) -> MPRemotePath:
+        target = mpremotepath(target)
+        target = target / self.name if target.is_dir() else target
+        with self.board.raw_repl() as r:
+            r.fs_cp(str(self), str(target))
+        return target
 
     @classmethod
     def connect(
@@ -225,11 +237,9 @@ class MPRemotePath(PosixPath):
     def rename(self, target: MPRemotePath | str) -> MPRemotePath:
         self._stat = None
         self.board.exec(f"os.rename({self.as_posix()!r},{str(target)!r})")
-        if isinstance(target, MPRemotePath):
-            target._stat = None
-            return target
-        else:
-            return self.__class__(str(target))
+        target = mpremotepath(target)
+        target._stat = None
+        return target
 
     def replace(self, target: MPRemotePath | str) -> MPRemotePath:
         return self.rename(target)
