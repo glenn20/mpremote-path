@@ -182,10 +182,7 @@ class MPRemotePath(PosixPath):
     def stat(self) -> os.stat_result:
         if hasattr(self, "_stat") and self._stat is not None:
             return self._stat
-        with self.board.raw_repl() as r:
-            self._stat = r.fs_stat(str(self))
-        if self._stat is None:
-            raise FileNotFoundError(f"No such file or directory: {str(self)!r}")
+        self._stat = self.board.fs_stat(str(self))
         return self._stat
 
     def owner(self) -> str:
