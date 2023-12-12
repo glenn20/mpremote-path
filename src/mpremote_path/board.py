@@ -5,12 +5,15 @@ import ast
 import os
 import re
 import sys
+import time
 from contextlib import contextmanager
 from enum import IntFlag
 from typing import Any, Generator
 
 import mpremote.transport_serial
 from mpremote.transport_serial import SerialTransport, TransportError
+
+time_offset_tolerance = 1  # seconds
 
 
 def my_stdout_write_bytes(b: bytes):
@@ -75,6 +78,8 @@ class Board:
     def __init__(self, transport: SerialTransport) -> None:
         self._transport = transport
         self.debug: Debug = Debug.NONE
+        self.epoch_offset: int = 0
+        self.clock_offset: int = 0
 
     def writer(self, b: bytes) -> None:
         """The writer function used by the mpremote SerialTransport instance."""
@@ -153,6 +158,34 @@ class Board:
         output as a python expression."""
         return ast.literal_eval(self.exec(code))
 
+    def check_time(
+        self, sync_clock: bool = False, utc: bool = False
+    ) -> tuple[int, int]:
+        """Check the time on the board and return the epoch offset and clock offset
+        in seconds. Will sync the board's RTC to the host's time if `sync` is True.
+        Will use UTC time if `utc` is True, otherwise local time will be used."""
+        with self.raw_repl():  # Make sure we are in raw repl mode
+            self.exec("import time, machine" if sync_clock else "import time")
+            # Calculate the epoch offset between the host anf the board's RTC.
+            tt = time.gmtime(time.time())[:8]  # Use now as a reference time
+            self.epoch_offset = round(
+                time.mktime((*tt, -1)) - int(self.eval(f"time.mktime({tt})"))
+            )
+            self.clock_offset = round(
+                time.time() - (int(self.eval("time.time()")) + self.epoch_offset)
+            )
+            t = time.gmtime() if utc else time.localtime()
+            t2 = (t.tm_year, t.tm_mon, t.tm_mday, 0, t.tm_hour, t.tm_min, t.tm_sec, 0)
+            if sync_clock and abs(self.clock_offset) > time_offset_tolerance:
+                self.exec(f"machine.RTC().datetime({t2})")
+                self.clock_offset = round(  # recalculate time offset
+                    time.time() - (int(self.eval("time.time()")) + self.epoch_offset)
+                )
+            time_list = self.eval("time.localtime()") + (-1,)  # is_dst = unknown
+            print(time.asctime(time.struct_time(time_list)))
+            print(f"epoch_offset = {self.epoch_offset}")
+            print(f"clock_offset = {self.clock_offset}")
+            return self.epoch_offset, self.clock_offset
 
     def fs_stat(self, filename: str) -> os.stat_result:
         """Wrapper around the mpremote `SerialTransport.fs_stat()` method.
