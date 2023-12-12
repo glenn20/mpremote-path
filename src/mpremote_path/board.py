@@ -1,6 +1,8 @@
 # For python<3.10: Allow method type annotations to reference enclosing class
 from __future__ import annotations
 
+import ast
+import os
 import re
 import sys
 from contextlib import contextmanager
@@ -126,22 +128,28 @@ class Board:
             print(f"Board.exec(): resp = {response!r}")
         return response
 
-    def _eval(self, code: bytes | str, parse=False) -> Any:
+    def _eval(self, expression: bytes | str, parse=False) -> Any:
         """Wrapper around the mpremote `SerialTransport.eval()` method."""
         if self.debug & Debug.EXEC:
-            print(f"Board.eval(): code = {code!r}")
-        with self.raw_repl(code) as r:
-            response = r.eval(code, parse)
+            print(f"Board.eval(): code = {expression!r}")
+        with self.raw_repl(expression) as r:
+            response = r.eval(expression, parse)
         if self.debug & Debug.EXEC:
             print(f"Board.eval(): resp = {response!r}")
         return response
 
-    def eval(self, code: bytes | str) -> Any:
-        """Execute `code` on the micropython board and evaluate the output as a
-        python expression."""
-        return self._eval(code, parse=True)
+    def eval(self, expression: bytes | str) -> Any:
+        """Execute `expression` on the micropython board and evaluate the
+        output as a python expression."""
+        return self._eval(expression, parse=True)
 
-    def eval_str(self, code: bytes | str) -> str:
-        """Execute `code` on the micropython board and return the output as a
-        python string."""
-        return self._eval(code, parse=False)
+    def eval_str(self, expression: bytes | str) -> str:
+        """Execute `expression` on the micropython board and return the output
+        as a python string."""
+        return self._eval(expression, parse=False)
+
+    def exec_eval(self, code: bytes | str) -> Any:
+        """Execute `code` on the micropython board and evaluate the printed
+        output as a python expression."""
+        return ast.literal_eval(self.exec(code))
+
