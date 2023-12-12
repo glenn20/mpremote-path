@@ -153,3 +153,16 @@ class Board:
         output as a python expression."""
         return ast.literal_eval(self.exec(code))
 
+
+    def fs_stat(self, filename: str) -> os.stat_result:
+        """Wrapper around the mpremote `SerialTransport.fs_stat()` method.
+        Converts the micropython timestamps to a unix timestamp by adding the
+        epoch offset calculated by `check_time()`."""
+        with self.raw_repl() as r:
+            stat = r.fs_stat(filename)
+        if stat is None:
+            raise FileNotFoundError(f"No such file or directory: '{self}'")
+        stat = os.stat_result(
+            stat[:-3] + tuple((t + self.epoch_offset for t in stat[-3:]))
+        )
+        return stat
