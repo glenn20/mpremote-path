@@ -151,6 +151,7 @@ def test_copy_copyfile(testfolder: MPath) -> None:
     assert str(q) == str(d1 / "test1.touch")
     assert q.read_text() == msg
     q.unlink()
+    d1.rmdir()
     with pytest.raises(SameFileError):
         q = p.copy(testfolder)
     p.unlink()
@@ -174,3 +175,4 @@ def test_not_implemented(testfolder: MPath) -> None:
         p.hardlink_to("test2.touch")  # No links on lfs or fat
     with pytest.raises(NotImplementedError):
         p.link_to("test2.touch")  # No links on lfs or fat
+    p.unlink()

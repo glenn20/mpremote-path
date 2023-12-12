@@ -92,7 +92,7 @@ class MPRemotePath(PosixPath):
     def chdir(self) -> MPRemotePath:
         "Set the current working directory on the board to this path." ""
         p = self.resolve()
-        self.board.exec(f"os.chdir({str(p)!r})")
+        self.board.exec(f"os.chdir('{p}')")
         return p
 
     def copyfile(self, target: MPRemotePath | str) -> MPRemotePath:
@@ -114,6 +114,8 @@ class MPRemotePath(PosixPath):
         port: str | Board | SerialTransport,
         baud: int = 115200,
         wait: int = 0,
+        sync_clock: bool = False,
+        utc: bool = False,
     ) -> None:
         """Connect to the micropython board on the given `port`.
         - `port` can be a `Board` instance, an mpremote `SerialTransport`
@@ -125,6 +127,7 @@ class MPRemotePath(PosixPath):
         `baud` and `wait` are only used if `port` is a string.
         """
         cls.board = make_board(port, baud, wait)
+        cls.board.check_time(sync_clock, utc)
 
     # Overrides for pathlib.Path methods
     @classmethod
@@ -142,7 +145,7 @@ class MPRemotePath(PosixPath):
         return self.resolve() == other.resolve()
 
     def iterdir(self) -> Iterator[MPRemotePath]:
-        for name in self.board.eval(f"os.listdir({str(self)!r})"):
+        for name in self.board.eval(f"os.listdir('{self}')"):
             yield self._make_child_relpath(name)  # type: ignore
 
     # `rglob()` calls `_scandir()` twice in a row for each dir, so cache the
@@ -152,7 +155,7 @@ class MPRemotePath(PosixPath):
     def _ilistdir(self) -> Iterable[MPRemoteDirEntry]:
         """Return an iterable of `MPRemoteDirEntry` objects for the files in a
         directory on the micropython `board`."""
-        ls = self.board.eval(f"list(os.ilistdir({str(self)!r}))")
+        ls = self.board.eval(f"list(os.ilistdir('{self}'))")
         return [MPRemoteDirEntry(*f) for f in ls]
 
     # glob() and rglob() rely on _scandir()
@@ -243,7 +246,7 @@ class MPRemotePath(PosixPath):
 
     def rename(self, target: MPRemotePath | str) -> MPRemotePath:
         self._stat = None
-        self.board.exec(f"os.rename({str(self)!r},{str(target)!r})")
+        self.board.exec(f"os.rename('{self}','{target}')")
         target = mpremotepath(target)
         target._stat = None
         return target
