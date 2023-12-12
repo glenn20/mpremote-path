@@ -28,6 +28,16 @@ def pytest_addoption(parser):
         default=115200,
         help="Baud rate for serial port: 115200",
     )
+    parser.addoption(
+        "--sync",
+        action="store_true",
+        help="Whether to synchronise board clock with host: False",
+    )
+    parser.addoption(
+        "--utc",
+        action="store_true",
+        help="Whether to use UTC for board clock: False",
+    )
 
 
 def rm_recursive(path: Path) -> None:
@@ -46,7 +56,12 @@ def rm_recursive(path: Path) -> None:
 @pytest.fixture()
 def root(pytestconfig) -> Generator[MPath, None, None]:
     if not hasattr(MPath, "board"):
-        MPath.connect(pytestconfig.option.port, pytestconfig.option.baud)
+        MPath.connect(
+            pytestconfig.option.port,
+            baud=pytestconfig.option.baud,
+            sync_clock=pytestconfig.option.sync,
+            utc=pytestconfig.option.utc,
+        )
         MPath.board.soft_reset()
         rm_recursive(MPath(test_dir))  # Clean up after previous test runs
     path, pwd = MPath("/"), MPath.cwd()

@@ -158,9 +158,7 @@ class Board:
         output as a python expression."""
         return ast.literal_eval(self.exec(code))
 
-    def check_time(
-        self, sync_clock: bool = False, utc: bool = False
-    ) -> tuple[int, int]:
+    def check_time(self, sync_clock: bool = False, utc: bool = False) -> None:
         """Check the time on the board and return the epoch offset and clock offset
         in seconds. Will sync the board's RTC to the host's time if `sync` is True.
         Will use UTC time if `utc` is True, otherwise local time will be used."""
@@ -181,11 +179,6 @@ class Board:
                 self.clock_offset = round(  # recalculate time offset
                     time.time() - (int(self.eval("time.time()")) + self.epoch_offset)
                 )
-            time_list = self.eval("time.localtime()") + (-1,)  # is_dst = unknown
-            print(time.asctime(time.struct_time(time_list)))
-            print(f"epoch_offset = {self.epoch_offset}")
-            print(f"clock_offset = {self.clock_offset}")
-            return self.epoch_offset, self.clock_offset
 
     def fs_stat(self, filename: str) -> os.stat_result:
         """Wrapper around the mpremote `SerialTransport.fs_stat()` method.
