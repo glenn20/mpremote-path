@@ -273,10 +273,10 @@ class MPRemotePath(PosixPath):
         return True
 
     def is_dir(self) -> bool:
-        return stat.S_ISDIR(self.stat().st_mode)
+        return self.exists() and stat.S_ISDIR(self.stat().st_mode)
 
     def is_file(self) -> bool:
-        return stat.S_ISREG(self.stat().st_mode)
+        return self.exists() and stat.S_ISREG(self.stat().st_mode)
 
     def is_mount(self) -> bool:
         return False
