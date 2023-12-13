@@ -122,13 +122,15 @@ class Board:
         self._transport.exit_raw_repl()
 
     # Methods to execute stuff in the raw_repl on the micropython board
-    def exec(self, code: bytes | str) -> str:
+    def exec(self, code: bytes | str, capture: bool = False) -> str:
         """Execute `code` on the micropython board and return the output as a
         string."""
         if self.debug & Debug.EXEC:
             print(f"Board.exec(): code = {code!r}")
         with self.raw_repl(code) as r:
-            response: str = r.exec(code, self.writer).decode().strip()
+            response: str = (
+                r.exec(code, None if capture else self.writer).decode().strip()
+            )
         if self.debug & Debug.EXEC:
             print(f"Board.exec(): resp = {response!r}")
         return response
@@ -156,7 +158,7 @@ class Board:
     def exec_eval(self, code: bytes | str) -> Any:
         """Execute `code` on the micropython board and evaluate the printed
         output as a python expression."""
-        return ast.literal_eval(self.exec(code))
+        return ast.literal_eval(self.exec(code, capture=True))
 
     def check_time(self, sync_clock: bool = False, utc: bool = False) -> None:
         """Check the time on the board and return the epoch offset and clock offset
