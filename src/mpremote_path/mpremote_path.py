@@ -114,7 +114,8 @@ class MPRemotePath(PosixPath):
         port: str | Board | SerialTransport,
         baud: int = 115200,
         wait: int = 0,
-        sync_clock: bool = False,
+        *,
+        set_clock: bool = False,
         utc: bool = False,
     ) -> None:
         """Connect to the micropython board on the given `port`.
@@ -126,8 +127,7 @@ class MPRemotePath(PosixPath):
           available.
         `baud` and `wait` are only used if `port` is a string.
         """
-        cls.board = make_board(port, baud, wait)
-        cls.board.check_time(sync_clock, utc)
+        cls.board = make_board(port, baud, wait, set_clock=set_clock, utc=utc)
 
     # Overrides for pathlib.Path methods
     @classmethod

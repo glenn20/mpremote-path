@@ -43,17 +43,24 @@ def make_transport(
 
 
 def make_board(
-    port: str | Board | SerialTransport, baud: int = 115200, wait: int = 0
+    port: str | Board | SerialTransport,
+    baud: int = 115200,
+    wait: int = 0,
+    *,
+    set_clock: bool = False,
+    utc: bool = False,
 ) -> Board:
     """Return a `Board` instance from a serial port name or a `SerialTransport`
     object or an existing `Board` instance."""
-    return (
+    board = (
         port
         if isinstance(port, Board)
         else Board(port)
         if isinstance(port, SerialTransport)
         else Board(make_transport(port, baud, wait))
     )
+    board.check_time(set_clock=set_clock, utc=utc)
+    return board
 
 
 class Debug(IntFlag):
@@ -160,12 +167,12 @@ class Board:
         output as a python expression."""
         return ast.literal_eval(self.exec(code, capture=True))
 
-    def check_time(self, sync_clock: bool = False, utc: bool = False) -> None:
+    def check_time(self, set_clock: bool = False, utc: bool = False) -> None:
         """Check the time on the board and return the epoch offset and clock offset
         in seconds. Will sync the board's RTC to the host's time if `sync` is True.
         Will use UTC time if `utc` is True, otherwise local time will be used."""
         with self.raw_repl():  # Make sure we are in raw repl mode
-            self.exec("import time, machine" if sync_clock else "import time")
+            self.exec("import time, machine" if set_clock else "import time")
             # Calculate the epoch offset between the host anf the board's RTC.
             tt = time.gmtime(time.time())[:8]  # Use now as a reference time
             self.epoch_offset = round(
@@ -176,7 +183,7 @@ class Board:
             )
             t = time.gmtime() if utc else time.localtime()
             t2 = (t.tm_year, t.tm_mon, t.tm_mday, 0, t.tm_hour, t.tm_min, t.tm_sec, 0)
-            if sync_clock and abs(self.clock_offset) > time_offset_tolerance:
+            if set_clock and abs(self.clock_offset) > time_offset_tolerance:
                 self.exec(f"machine.RTC().datetime({t2})")
                 self.clock_offset = round(  # recalculate time offset
                     time.time() - (int(self.eval("time.time()")) + self.epoch_offset)
