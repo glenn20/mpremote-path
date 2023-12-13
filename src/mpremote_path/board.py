@@ -88,6 +88,9 @@ class Board:
         self.epoch_offset: int = 0
         self.clock_offset: int = 0
 
+    def device_name(self) -> str:
+        return self._transport.device_name
+
     def writer(self, b: bytes) -> None:
         """The writer function used by the mpremote SerialTransport instance."""
         print(b.decode(), end="")
@@ -186,7 +189,7 @@ class Board:
             if set_clock and abs(self.clock_offset) > time_offset_tolerance:
                 self.exec(f"machine.RTC().datetime({t2})")
                 self.clock_offset = round(  # recalculate time offset
-                    time.time() - (int(self.eval("time.time()")) + self.epoch_offset)
+                    time.time() - int(self.eval("time.time()")) - self.epoch_offset
                 )
 
     def fs_stat(self, filename: str) -> os.stat_result:
@@ -197,7 +200,6 @@ class Board:
             stat = r.fs_stat(filename)
         if stat is None:
             raise FileNotFoundError(f"No such file or directory: '{self}'")
-        stat = os.stat_result(
+        return os.stat_result(
             stat[:-3] + tuple((t + self.epoch_offset for t in stat[-3:]))
         )
-        return stat

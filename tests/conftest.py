@@ -59,7 +59,7 @@ def root(pytestconfig) -> Generator[MPath, None, None]:
         MPath.connect(
             pytestconfig.option.port,
             baud=pytestconfig.option.baud,
-            sync_clock=pytestconfig.option.sync,
+            set_clock=pytestconfig.option.sync,
             utc=pytestconfig.option.utc,
         )
         MPath.board.soft_reset()
