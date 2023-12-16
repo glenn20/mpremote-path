@@ -1,22 +1,19 @@
-"""Provides the "RemotePath" class which is a wrapper around the
-PyBoardExtended interface to a micropython board (from the mpremote tool).
+"""Provides the `MPRemotePath` class which provides a `pathlib.Path` compatible
+interface to accessing and manipulating files on micropython boards via the
+`mpremote` tool.
 """
 # Copyright (c) 2021 @glenn20
 # MIT License
 
-
 # For python<3.10: Allow method type annotations to reference enclosing class
 from __future__ import annotations
-
-from shutil import SameFileError
-
-__version__ = "0.0.1"
 
 import os
 import stat
 from contextlib import contextmanager
 from functools import lru_cache
 from pathlib import Path, PosixPath
+from shutil import SameFileError
 from typing import Any, Generator, Iterable, Iterator
 
 from mpremote.transport_serial import SerialTransport
@@ -35,12 +32,17 @@ class MPRemoteDirEntry:
     micropython board. This is used to support the `_scandir()`, `glob()` and
     `rglob()` methods of `MPRemotePath`."""
 
-    def __init__(self, path: str, mode: int = 0, inode: int = 0, size: int = 0) -> None:
+    def __init__(
+        self, path: str, mode: int = 0, inode: int = 0, size: int = 0, mtime: int = 0
+    ) -> None:
         self.path: str = path
         self._mode: int = mode
         self._inode: int = inode
         self._size: int = size
-        self._stat: os.stat_result | None = None
+        self._mtime: int = mtime
+        self._stat: os.stat_result = os.stat_result(
+            (mode, inode, 0, 0, 0, 0, size, mtime, mtime, mtime)
+        )
 
     @property
     def name(self) -> str:
@@ -125,6 +127,9 @@ class MPRemotePath(PosixPath):
         - `baud` is the baud rate to use for the serial connection
         - `wait` is the number of seconds to wait for the board to become
           available.
+        - `set_clock` is a boolean indicating whether to synchronise the board
+          clock with the host clock.
+        - `utc` is a boolean indicating whether to use UTC for the board clock
         `baud` and `wait` are only used if `port` is a string.
         """
         cls.board = make_board(port, baud, wait, set_clock=set_clock, utc=utc)
@@ -144,9 +149,14 @@ class MPRemotePath(PosixPath):
         other = mpremotepath(other)
         return self.resolve() == other.resolve()
 
+    def _from_direntry(self, entry: MPRemoteDirEntry) -> MPRemotePath:
+        p = self._make_child_relpath(entry.path)  # type: ignore
+        p._stat = entry.stat()
+        return p
+
     def iterdir(self) -> Iterator[MPRemotePath]:
-        for name in self.board.eval(f"os.listdir('{self}')"):
-            yield self._make_child_relpath(name)  # type: ignore
+        with self._scandir() as it:
+            return (self._from_direntry(f) for f in it)
 
     # `rglob()` calls `_scandir()` twice in a row for each dir, so cache the
     # results from the board.
