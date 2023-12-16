@@ -1,15 +1,20 @@
+import logging.config
 import os
 from contextlib import suppress
 from pathlib import Path
 from typing import Generator
 
 import pytest
+import yaml
 from mpremote.transport_serial import TransportError
 
 from mpremote_path import MPRemotePath as MPath
 
 test_dir = "/_tests"
 data_dir = "tests/_data"
+
+
+logging.config.dictConfig(yaml.safe_load(Path("tests/logging.yaml").read_text()))
 
 
 def pytest_addoption(parser):
