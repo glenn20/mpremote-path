@@ -151,8 +151,9 @@ class MPRemotePath(PosixPath):
         return cls("/")
 
     def samefile(self, other: Path | str) -> bool:
-        other = mpremotepath(other)
-        return self.resolve() == other.resolve()
+        if isinstance(other, str):
+            other = MPRemotePath(other)
+        return isinstance(other, MPRemotePath) and self.resolve() == other.resolve()
 
     def _from_direntry(self, entry: MPRemoteDirEntry) -> MPRemotePath:
         """Create a new `MPRemotePath` instance from a `MPRemoteDirEntry`
