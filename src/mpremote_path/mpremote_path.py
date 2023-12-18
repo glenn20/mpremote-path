@@ -20,6 +20,11 @@ from mpremote.transport_serial import SerialTransport
 
 from .board import Board, make_board
 
+START_CODE = """
+def _ils(p):
+  for f in os.ilistdir(p):print(f, end=',')
+"""
+
 
 def mpremotepath(f: Any) -> MPRemotePath:
     return f if isinstance(f, MPRemotePath) else MPRemotePath(str(f))
@@ -29,17 +34,13 @@ class MPRemoteDirEntry:
     """A duck-typed version of `os.DirEntry` for use with `MPRemotePath`.
 
     Will be initialised from the results of calling `os.ilistdir()` on the
-    micropython board. This is used to support the `_scandir()`, `glob()` and
-    `rglob()` methods of `MPRemotePath`."""
+    micropython board. This is used to support the `iterdir()`, `_scandir()`,
+    `glob()` and `rglob()` methods of `MPRemotePath`."""
 
     def __init__(
         self, path: str, mode: int = 0, inode: int = 0, size: int = 0, mtime: int = 0
     ) -> None:
         self.path: str = path
-        self._mode: int = mode
-        self._inode: int = inode
-        self._size: int = size
-        self._mtime: int = mtime
         self._stat: os.stat_result = os.stat_result(
             (mode, inode, 0, 0, 0, 0, size, mtime, mtime, mtime)
         )
@@ -49,23 +50,26 @@ class MPRemoteDirEntry:
         return self.path[self.path.rfind("/") + 1 :]
 
     def inode(self) -> int:
-        return self._inode
+        return self._stat.st_ino
 
     def is_dir(self, *, follow_symlinks: bool = True) -> bool:
-        return stat.S_ISDIR(self._mode)
+        return stat.S_ISDIR(self._stat.st_mode)
 
     def is_file(self, *, follow_symlinks: bool = True) -> bool:
-        return stat.S_ISREG(self._mode)
+        return stat.S_ISREG(self._stat.st_mode)
 
     def is_symlink(self) -> bool:
-        return stat.S_ISLNK(self._mode)
+        return stat.S_ISLNK(self._stat.st_mode)
 
     def stat(self, *, follow_symlinks: bool = True) -> os.stat_result:
-        if self._stat is None:
+        if self._stat is None:  # or self._stat.st_mtime == 0:
             if not MPRemotePath.board:
-                raise ValueError("RemotePath.board must be set before use.")
-            s = MPRemotePath.board.eval(f"os.stat({self.path!r})")
-            self._stat = os.stat_result(s)
+                raise ValueError("MPRemotePath.connect() must be called before use.")
+            if self._stat is None:  # Get the full os.stat() result
+                self._stat = MPRemotePath.board.fs_stat(self.path)
+            else:  # We already have everything except the mtime so just fetch that
+                mtime = MPRemotePath.board.eval(f"os.stat({self.path!r})[8]")
+                self._stat = os.stat_result(self._stat[:7] + (mtime, mtime, mtime))
         return self._stat
 
 
@@ -133,6 +137,7 @@ class MPRemotePath(PosixPath):
         `baud` and `wait` are only used if `port` is a string.
         """
         cls.board = make_board(port, baud, wait, set_clock=set_clock, utc=utc)
+        cls.board.exec(START_CODE)
 
     # Overrides for pathlib.Path methods
     @classmethod
@@ -150,7 +155,10 @@ class MPRemotePath(PosixPath):
         return self.resolve() == other.resolve()
 
     def _from_direntry(self, entry: MPRemoteDirEntry) -> MPRemotePath:
-        p = self._make_child_relpath(entry.path)  # type: ignore
+        """Create a new `MPRemotePath` instance from a `MPRemoteDirEntry`
+        object. The file `stat()` information from the `direntry` is cached in
+        the new instance."""
+        p = self._make_child_relpath(entry.name)  # type: ignore
         p._stat = entry.stat()
         return p
 
@@ -165,8 +173,8 @@ class MPRemotePath(PosixPath):
     def _ilistdir(self) -> Iterable[MPRemoteDirEntry]:
         """Return an iterable of `MPRemoteDirEntry` objects for the files in a
         directory on the micropython `board`."""
-        ls = self.board.eval(f"list(os.ilistdir('{self}'))")
-        return [MPRemoteDirEntry(*f) for f in ls]
+        ls = self.board.exec_eval(f"_ils('{self}')")
+        return [MPRemoteDirEntry(f"{self}/{name}", *extra) for name, *extra in ls]
 
     # glob() and rglob() rely on _scandir()
     @contextmanager
@@ -174,10 +182,7 @@ class MPRemotePath(PosixPath):
         """A context manager which produces an iterable of information about the
         files in a folder on the micropython board. This is used by `glob()` and
         `rglob()`."""
-        try:
-            yield (f for f in self._ilistdir())
-        finally:
-            pass
+        yield (f for f in self._ilistdir())
 
     def resolve(self, strict: bool = False) -> MPRemotePath:
         # The fs on the board has no concept of symlinks, so just eliminate ".."
