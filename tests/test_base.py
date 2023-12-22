@@ -166,6 +166,8 @@ def test_not_implemented(testfolder: MPath) -> None:
     with pytest.raises(NotImplementedError):
         p.chmod(0o777)  # No groups or other permissions on lfs or fat
     with pytest.raises(NotImplementedError):
+        p.open()  # Not implemented yet - complex to do right
+    with pytest.raises(NotImplementedError):
         p.lchmod(0o777)  # No groups or other permissions on lfs or fat
     with pytest.raises(NotImplementedError):
         p.readlink()  # No links on lfs or fat

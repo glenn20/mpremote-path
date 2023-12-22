@@ -7,7 +7,6 @@ from typing import Generator
 import pytest
 import yaml
 from mpremote.transport_serial import TransportError
-
 from mpremote_path import MPRemotePath as MPath
 
 test_dir = "/_tests"
@@ -67,7 +66,7 @@ def root(pytestconfig) -> Generator[MPath, None, None]:
             set_clock=pytestconfig.option.sync,
             utc=pytestconfig.option.utc,
         )
-        MPath.board.soft_reset()
+        # MPath.board.soft_reset()
         rm_recursive(MPath(test_dir))  # Clean up after previous test runs
     path, pwd = MPath("/"), MPath.cwd()
     path.chdir()
