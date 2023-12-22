@@ -79,7 +79,8 @@ If you use a python virtual environment (recommended), make sure it is active.
 
 To install in your python environment:
 
-- Install in "editable mode":
+- Install in ["editable
+  mode"](https://setuptools.pypa.io/en/latest/userguide/development_mode.html):
 
   ```bash
   pip install -e .
@@ -136,7 +137,7 @@ tests/test_recursive_copy.py::test_recursive_rm PASSED                   [100%]
     `MPRemotePath`). (See [`pathlib.Path`](
     https://docs.python.org/3/library/pathlib.html#pathlib.Path))
 
-#### Additional methods
+#### Additional methods (nor present in ordinary `Path` instances)
 
 - Classmethod: **`connect(port: str | Board | SerialTransport) -> None`**
 
@@ -156,6 +157,18 @@ tests/test_recursive_copy.py::test_recursive_rm PASSED                   [100%]
     existing directory. This is provided as a convenience to simplify changing
     the working directory on the board. Returns the new working directory as a
     normalised absolute path. This is an `MPRemotePath`-only extension.
+
+- Method: **`copyfile(target: MPRemotePath | str) -> MPRemotePath`**
+
+  - Make a copy (named `target`) of a file on the micropython board. `target`
+    may be the name of the target file (`str`) or another `MPRemotePath`
+    instance.
+
+- Method: **`copy(target: MPRemotePath | str) -> MPRemotePath`**
+
+  - Make a copy (named `target`) of the file or directory. If the source object
+    is a directory, create a new directory called `target`. If the source object
+    is a regular file, make a copy with `copyfile(target)`.
 
 #### Inherited Properties, Methods and Operators
 
@@ -180,11 +193,15 @@ tests/test_recursive_copy.py::test_recursive_rm PASSED                   [100%]
   - *Methods*:
     - `cwd()`, `home()`, `stat()`, `exists()`, `expanduser()`, `glob(pattern)`,
       `group()`, `is_dir()`, `is_file()`, `is_junction()`, `is_mount()`,
-      `is_symlink()`, `is_socket()`, `is_fifo()`, `is_block_device()`,
-      `is_char_device()`, `iterdir()`, `walk()`, `lstat()`, `mkdir()`,
-      `owner()`, `read_bytes()`, `read_text()`, `rename()`, `absolute()`,
-      `resolve()`, `rglob(pattern)`, `rmdir()`, `touch()`, `unlink()`,
-      `write_bytes(data)`, `write_text(text)`
+      `samefile(other)`, `is_symlink()`, `is_socket()`, `is_fifo()`,
+      `is_block_device()`, `is_char_device()`, `iterdir()`, `walk()`, `lstat()`,
+      `mkdir()`, `owner()`, `read_bytes()`, `read_text()`, `rename(target)`,
+      `replace(target)`, `absolute()`, `resolve()`, `rglob(pattern)`, `rmdir()`,
+      `touch()`, `unlink()`, `write_bytes(data)`, `write_text(text)`
   - *Will raise a `NotImplemented` exception*:
-    - `chmod()`, `lchmod()`, `open()`, `read_link()`, `replace()`,
-      `samefile(other)`, `symlimk_to(target)`, `hardlink_to(target)`
+    - `chmod()`, `lchmod()`, `open()`, `read_link()`, `symlimk_to(target)`,
+      `hardlink_to(target)`
+
+## `mpremote_path.utils` module
+
+
