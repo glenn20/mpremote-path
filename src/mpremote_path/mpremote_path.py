@@ -14,7 +14,7 @@ from contextlib import contextmanager
 from functools import lru_cache
 from pathlib import Path, PosixPath
 from shutil import SameFileError
-from typing import Any, Generator, Iterable, Iterator
+from typing import Any, Generator, Iterable
 
 from mpremote.transport_serial import SerialTransport
 
@@ -163,7 +163,7 @@ class MPRemotePath(PosixPath):
         p._stat = entry.stat()
         return p
 
-    def iterdir(self) -> Iterator[MPRemotePath]:
+    def iterdir(self) -> Iterable[MPRemotePath]:
         with self._scandir() as it:
             return (self._from_direntry(f) for f in it)
 
@@ -174,16 +174,17 @@ class MPRemotePath(PosixPath):
     def _ilistdir(self) -> Iterable[MPRemoteDirEntry]:
         """Return an iterable of `MPRemoteDirEntry` objects for the files in a
         directory on the micropython `board`."""
-        ls = self.board.exec_eval(f"_ils('{self}')")
+        # exec_eval() will return None if the directory is empty
+        ls = self.board.exec_eval(f"_ils('{self}')") or tuple()
         return [MPRemoteDirEntry(f"{self}/{name}", *extra) for name, *extra in ls]
 
     # glob() and rglob() rely on _scandir()
     @contextmanager
     def _scandir(self) -> Generator[Iterable[MPRemoteDirEntry], None, None]:
-        """A context manager which produces an iterable of information about the
-        files in a folder on the micropython board. This is used by `glob()` and
-        `rglob()`."""
-        yield (f for f in self._ilistdir())
+        """Override for Path._scandir(): a context manager which produces an
+        iterable of information about the files in a folder. This is used by
+        `glob()` and `rglob()`."""
+        yield self._ilistdir()
 
     def resolve(self, strict: bool = False) -> MPRemotePath:
         # The fs on the board has no concept of symlinks, so just eliminate ".."

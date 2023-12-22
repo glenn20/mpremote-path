@@ -119,6 +119,7 @@ class Board:
     def __repr__(self) -> str:
         return f"Board({self.dev!r})"
 
+    @property
     def device_name(self) -> str:
         return self._transport.device_name
 
@@ -193,7 +194,8 @@ class Board:
     def exec_eval(self, code: bytes | str) -> Any:
         """Execute `code` on the micropython board and evaluate the printed
         output as a python expression."""
-        return ast.literal_eval(self.exec(code, capture=True))
+        response = self.exec(code, capture=True)
+        return ast.literal_eval(response) if response else None
 
     def check_time(self, set_clock: bool = False, utc: bool = False) -> None:
         """Check the time on the board and save the epoch offset and clock
