@@ -1,3 +1,7 @@
+"""Provides the `Board` class for interacting with a micropython board via
+mpremote.
+"""
+
 # For python<3.10: Allow method type annotations to reference enclosing class
 from __future__ import annotations
 
@@ -29,17 +33,24 @@ def _mpath_stdout_write_bytes(b: bytes):
 mpremote.transport_serial.stdout_write_bytes = _mpath_stdout_write_bytes
 
 
-def make_transport(
-    device: str, baudrate: int = 115200, wait: int = 0
-) -> SerialTransport:
-    """Create a `SerialTransport` instance on the given serial port.
+def device_long_name(device: str) -> str:
+    """Return the full name of a serial port device file.
     `device` may be a port name (eg. "/dev/ttyUSB0") or a short name (eg. "u0")
     """
-    port: str = device
-    port = re.sub(r"^u([0-9]+)$", r"/dev/ttyUSB\1", port)
-    port = re.sub(r"^a([0-9]+)$", r"/dev/ttyACM\1", port)
-    port = re.sub(r"^c([0-9]+)$", r"COM\1", port)
-    return SerialTransport(port, baudrate, wait)
+    device = re.sub(r"^u([0-9]+)$", r"/dev/ttyUSB\1", device)
+    device = re.sub(r"^a([0-9]+)$", r"/dev/ttyACM\1", device)
+    device = re.sub(r"^c([0-9]+)$", r"COM\1", device)
+    return device
+
+
+def device_short_name(device: str) -> str:
+    """Return the short name of a serial port device file.
+    `device` may be a full port name (eg. "/dev/ttyUSB0") or a short name (eg. "u0")
+    """
+    device = re.sub(r"^/dev/ttyUSB([0-9]+)$", r"u\1", device)
+    device = re.sub(r"^/dev/ttyACM([0-9]+)$", r"a\1", device)
+    device = re.sub(r"^/COM([0-9]+)$", r"c\1", device)
+    return device
 
 
 def make_board(
@@ -58,11 +69,15 @@ def make_board(
     board = (
         port
         if isinstance(port, Board)
-        else Board(port, writer=writer)
-        if isinstance(port, SerialTransport)
-        else Board(make_transport(port, baud, wait), writer=writer)
+        else (
+            Board(port, writer=writer)
+            if isinstance(port, SerialTransport)
+            else Board(
+                SerialTransport(device_long_name(port), baud, wait), writer=writer
+            )
+        )
     )
-    board.check_time(set_clock=set_clock, utc=utc)
+    board.check_clock(set_clock=set_clock, utc=utc)
     return board
 
 
@@ -95,7 +110,7 @@ class Board:
     Board also provides convenience wrappers and methods for executing code on
     the micropython board:
         `exec()`, `eval()`, `eval_str()`, `exec_eval()`, `fs_stat()` and
-        `check_time()`.
+        `check_clock()`.
     """
 
     def __init__(
@@ -110,18 +125,17 @@ class Board:
         self._writer = writer
         self.epoch_offset: int = 0
         self.clock_offset: int = 0
-        dev = transport.device_name
-        dev = re.sub(r"^/dev/ttyUSB([0-9]+)$", r"u\1", dev)
-        dev = re.sub(r"^/dev/ttyACM([0-9]+)$", r"a\1", dev)
-        dev = re.sub(r"^/COM([0-9]+)$", r"c\1", dev)
-        self.dev = dev  # The abbreviated name of the serial port device
 
     def __repr__(self) -> str:
-        return f"Board({self.dev!r})"
+        return f"Board({self.short_name!r})"
 
     @property
     def device_name(self) -> str:
         return self._transport.device_name
+
+    @property
+    def short_name(self) -> str:
+        return device_short_name(self._transport.device_name)
 
     def writer(self, data: bytes) -> None:
         """The writer function used by the mpremote SerialTransport instance."""
@@ -183,7 +197,7 @@ class Board:
 
     def eval(self, expression: bytes | str) -> Any:
         """Execute `expression` on the micropython board and evaluate the
-        output as a python expression."""
+        output as a python expression on the local host."""
         return self._eval(expression, parse=True)
 
     def eval_str(self, expression: bytes | str) -> str:
@@ -192,26 +206,26 @@ class Board:
         return self._eval(expression, parse=False)
 
     def exec_eval(self, code: bytes | str) -> Any:
-        """Execute `code` on the micropython board and evaluate the printed
-        output as a python expression."""
+        """Execute `code` on the micropython board and (safely) evaluate the
+        printed output as a python expression on the local host."""
         response = self.exec(code, capture=True)
         return ast.literal_eval(response) if response else None
 
-    def check_time(self, set_clock: bool = False, utc: bool = False) -> None:
+    def check_clock(self, set_clock: bool = False, utc: bool = False) -> None:
         """Check the time on the board and save the epoch offset and clock
         offset between the host and the board (in seconds). Will sync the
-        board's RTC to the host's time if `sync` is True. Will use UTC time if
-        `utc` is True, otherwise local time will be used."""
-        with self.raw_repl():  # Make sure we are in raw repl mode
+        board's RTC to the host's time if `set_clock` is True. Will use UTC time
+        if `utc` is True, otherwise local time will be used."""
+        with self.raw_repl():  # Wrapper so we only enter/exit raw repl mode once
             self.exec("import time, machine" if set_clock else "import time")
             # Calculate the epoch offset between the host and the board.
             tt = time.gmtime(time.time())[:8]  # Use now as a reference time
             self.epoch_offset = round(
                 time.mktime((*tt, -1)) - int(self.eval(f"time.mktime({tt})"))
             )
-            # Calculate the offset between the host clock and the board's RTC.
+            # Calculate the offset (seconds) of the board's RTC from the host clock.
             self.clock_offset = round(
-                time.time() - int(self.eval("time.time()")) - self.epoch_offset
+                int(self.eval("time.time()")) + self.epoch_offset - time.time()
             )
             t = time.gmtime() if utc else time.localtime()
             t2 = (t.tm_year, t.tm_mon, t.tm_mday, 0, t.tm_hour, t.tm_min, t.tm_sec, 0)
@@ -219,20 +233,20 @@ class Board:
                 # Set the board's RTC to the host's time
                 self.exec(f"machine.RTC().datetime({t2})")
                 self.clock_offset = round(  # recalculate time offset
-                    time.time() - int(self.eval("time.time()")) - self.epoch_offset
+                    int(self.eval("time.time()")) + self.epoch_offset - time.time()
                 )
 
     @logmethod
     def fs_stat(self, filename: str) -> os.stat_result:
         """Wrapper around the mpremote `SerialTransport.fs_stat()` method.
         Converts the micropython timestamps to a unix timestamp by adding the
-        epoch offset calculated by `check_time()`.
-        Note: does not correct for differences between the host clock and the
-        micropython clock. Use `check_time(True)` to synchronise the clocks."""
+        epoch offset calculated by `Board.check_clock()`. Note: does not correct
+        for differences between the host clock and the micropython clock. Use
+        `Board.check_clock(set_clock=True)` to synchronise the clocks."""
         with self.raw_repl() as r:
             stat = r.fs_stat(filename)
         if stat is None:
             raise FileNotFoundError(f"No such file or directory: '{self}'")
-        return os.stat_result(
+        return os.stat_result(  # Add epoch_offset to the micropython timestamps
             stat[:-3] + tuple((t + self.epoch_offset for t in stat[-3:]))
         )
