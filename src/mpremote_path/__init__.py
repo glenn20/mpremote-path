@@ -8,4 +8,4 @@ interface to accessing and manipulating files on micropython boards via the
 __version__ = "0.0.1"
 
 from .board import Board  # noqa: F401
-from .mpremote_path import MPRemotePath  # noqa: F401
+from .mpremote_path import MPRemotePath, mpremotepath  # noqa: F401
