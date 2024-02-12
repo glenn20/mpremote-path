@@ -9,8 +9,8 @@ import yaml
 from mpremote.transport_serial import TransportError
 from mpremote_path import MPRemotePath as MPath
 
-test_dir = "/_tests"
-data_dir = "tests/_data"
+test_dir = "/_tests"  # Directory to create for tests on the micropython board.
+data_dir = "tests/_data"  # Local directory containing test data files.
 
 
 logging.config.dictConfig(yaml.safe_load(Path("tests/logging.yaml").read_text()))
@@ -45,6 +45,7 @@ def pytest_addoption(parser):
 
 
 def rm_recursive(path: Path) -> None:
+    """Remove a directory and all it's contents recursively."""
     if not path.exists():
         return
     elif path.is_dir():
@@ -75,7 +76,7 @@ def root(pytestconfig) -> Generator[MPath, None, None]:
 
 
 @pytest.fixture()
-def testdir(root):
+def testdir(root: MPath):
     path, pwd = MPath(test_dir), MPath.cwd()
     yield path
     if pwd:  # Restore the previous working directory and cleanup
@@ -86,14 +87,18 @@ def testdir(root):
 def testfolder(root: MPath) -> Generator[MPath, None, None]:
     "Create a test folder on the board and cd into it."
     path, pwd = MPath(test_dir), MPath.cwd()
+    if path in (pwd, *pwd.parents):
+        MPath("/").chdir()
+    rm_recursive(path)
     with suppress(TransportError, OSError):
         path.mkdir()
     path.chdir()
-    yield path
-    if pwd:  # Restore the previous working directory and cleanup
+    try:
+        yield path
+    finally:
         pwd.chdir()
     with suppress(TransportError, OSError):
-        path.rmdir()
+        rm_recursive(path)
 
 
 @pytest.fixture()
@@ -101,5 +106,11 @@ def localdata() -> Generator[Path, None, None]:
     "Change to the local data directory."
     pwd = os.getcwd()
     os.chdir(data_dir)
-    yield Path(".").resolve()
-    os.chdir(pwd)
+    rm_recursive(Path("test2"))
+    try:
+        yield Path(".").resolve()
+    finally:
+        # rm_recursive(Path("test2"))
+        os.chdir(pwd)
+    with suppress(TransportError, OSError):
+        rm_recursive(Path("test2"))

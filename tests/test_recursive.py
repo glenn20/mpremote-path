@@ -44,10 +44,6 @@ def rm_recursive(path: Path) -> None:
         raise ValueError(f"{path} is not a directory or file")
 
 
-# test_recursive_copy(), test_glob_rglob(), and test_recursive_rm() should
-# always be run together and in sequence
-
-
 def test_recursive_copy(testfolder: MPath, localdata: Path) -> None:
     "Test recursively copying local files to the micropython board."
     src, dest = Path("./lib"), MPath("./lib")
@@ -64,7 +60,9 @@ def test_recursive_copy(testfolder: MPath, localdata: Path) -> None:
 
 def test_glob_rglob(testfolder: MPath, localdata: Path) -> None:
     "Test glob methods."
-    src, dest = Path("."), MPath(".")
+    src, dest = Path("./lib"), MPath("./lib")
+    assert (src.exists(), dest.exists()) == (True, False)
+    copy_recursive(src, dest)
     assert sorted([f.as_posix() for f in (src / "lib/ota").glob("*.py")]) == sorted(
         [f.as_posix() for f in (dest / "lib/ota").glob("*.py")]
     )
