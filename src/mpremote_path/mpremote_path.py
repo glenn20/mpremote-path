@@ -2,6 +2,7 @@
 interface to accessing and manipulating files on micropython boards via the
 `mpremote` tool.
 """
+
 # Copyright (c) 2021 @glenn20
 # MIT License
 
@@ -11,10 +12,9 @@ from __future__ import annotations
 import os
 import stat
 from contextlib import contextmanager
-from functools import lru_cache
 from pathlib import Path, PosixPath
 from shutil import SameFileError
-from typing import Any, Generator, Iterable
+from typing import Generator, Iterable
 
 from mpremote.transport_serial import SerialTransport
 
@@ -26,8 +26,8 @@ def _ils(p):
 """
 
 
-def mpremotepath(f: Any) -> MPRemotePath:
-    return f if isinstance(f, MPRemotePath) else MPRemotePath(str(f))
+def mpremotepath(f: str | Path) -> MPRemotePath:
+    return f if isinstance(f, MPRemotePath) else MPRemotePath(f)
 
 
 class MPRemoteDirEntry:
@@ -35,19 +35,26 @@ class MPRemoteDirEntry:
 
     Will be initialised from the results of calling `os.ilistdir()` on the
     micropython board. This is used to support the `iterdir()`, `_scandir()`,
-    `glob()` and `rglob()` methods of `MPRemotePath`."""
+    `glob()` and `rglob()` methods of `pathlib.Path` for `MPRemotePath`s."""
 
     def __init__(
-        self, path: str, mode: int = 0, inode: int = 0, size: int = 0, mtime: int = 0
+        self,
+        parent: str,
+        name: str,
+        mode: int = 0,
+        inode: int = 0,
+        size: int = 0,
+        mtime: int = 0,
     ) -> None:
-        self.path: str = path
+        self.name: str = name
+        self.parent: str = parent
         self._stat: os.stat_result = os.stat_result(
             (mode, inode, 0, 0, 0, 0, size, mtime, mtime, mtime)
         )
 
     @property
-    def name(self) -> str:
-        return self.path[self.path.rfind("/") + 1 :]
+    def path(self) -> str:
+        return f"{self.parent}/{self.name}"
 
     def inode(self) -> int:
         return self._stat.st_ino
@@ -76,9 +83,8 @@ class MPRemoteDirEntry:
 # Paths on the board are always Posix paths even if local host is Windows.
 class MPRemotePath(PosixPath):
     "A `pathlib.Path` compatible class to hold details of files on the board."
-    slots = ("_stat", "board", "epoch_offset")
+    slots = ("_stat", "board")
     board: Board
-    epoch_offset: int
     _stat: os.stat_result | None
     _drv: str  # Declare types for properties inherited from pathlib classes
     _root: str
@@ -170,15 +176,15 @@ class MPRemotePath(PosixPath):
     # `rglob()` calls `_scandir()` twice in a row for each dir, so cache the
     # results from the board.
     # TODO: replace with real caching.
-    @lru_cache(maxsize=1)
+    # @lru_cache(maxsize=1)
     def _ilistdir(self) -> Iterable[MPRemoteDirEntry]:
         """Return an iterable of `MPRemoteDirEntry` objects for the files in a
         directory on the micropython `board`."""
         # exec_eval() will return None if the directory is empty
         ls = self.board.exec_eval(f"_ils('{self}')") or tuple()
-        return [MPRemoteDirEntry(f"{self}/{name}", *extra) for name, *extra in ls]
+        return [MPRemoteDirEntry(str(self), name, *extra) for name, *extra in ls]
 
-    # glob() and rglob() rely on _scandir()
+    # glob(), rglob() and walk() rely on _scandir()
     @contextmanager
     def _scandir(self) -> Generator[Iterable[MPRemoteDirEntry], None, None]:
         """Override for Path._scandir(): a context manager which produces an
@@ -261,14 +267,14 @@ class MPRemotePath(PosixPath):
     def lstat(self) -> os.stat_result:
         return self.stat()
 
-    def rename(self, target: MPRemotePath | str) -> MPRemotePath:
-        self._stat = None
+    def rename(self, target: Path | str) -> MPRemotePath:
         self.board.exec(f"os.rename('{self}','{target}')")
         target = mpremotepath(target)
-        target._stat = None
+        target._stat = self._stat
+        self._stat = None
         return target
 
-    def replace(self, target: MPRemotePath | str) -> MPRemotePath:
+    def replace(self, target: Path | str) -> MPRemotePath:
         return self.rename(target)
 
     def symlink_to(
@@ -314,7 +320,7 @@ class MPRemotePath(PosixPath):
         return False
 
     def expanduser(self) -> MPRemotePath:
-        return (
+        return (  # Interpret a leading "~/" as the root directory
             self._from_parts(["/"] + self._parts[1:])  # type: ignore
             if (not (self._drv or self._root) and self._parts[:1] == ["~"])
             else self
