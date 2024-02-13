@@ -164,35 +164,43 @@ def ls(
     ls_func(dirlist)
 
 
-def get(files: FileList, dest: Path | str) -> None:
+def get(files: FileList, dest: Path | str) -> Path:
     """Get files and directories from the micropython board.
     `dest` must be an existing directory."""
-    mpfs.copy(remote_path_list(files), local_path(dest))
+    p = local_path(dest)
+    mpfs.copy(remote_path_list(files), p)
+    return p
 
 
-def put(files: FileList, dest: Path | str) -> None:
+def put(files: FileList, dest: Path | str) -> MPRemotePath:
     """Get files and directories from the micropython board.
     `dest` must be an existing directory."""
-    mpfs.copy(local_path_list(files), mpremotepath(dest))
+    p = mpremotepath(dest)
+    mpfs.copy(local_path_list(files), p)
+    return p
 
 
-def cp(files: FileList, dest: Path | str) -> None:
+def cp(files: FileList, dest: Path | str) -> MPRemotePath:
     """Copy files and directories from `files` to `dest` on the micropython board.
     If `dest` is an existing directory, move all files into it.
     If `dest` is not an existing directory and there is only one source `file`
     it will be renamed to `dest`.
     Otherwise a `ValueError` is raised."""
-    mpfs.copy(remote_path_list(files), mpremotepath(dest))
+    p = mpremotepath(dest)
+    mpfs.copy(remote_path_list(files), p)
+    return p
 
 
-def mv(files: FileList, dest: Path | str) -> None:
+def mv(files: FileList, dest: Path | str) -> MPRemotePath:
     """Implement the `mv` command to move/rename files and directories.
     If `dest` is an existing directory, move all files/dirs into it.
     If `dest` is not an existing directory and there is only one source `path`
     it will be renamed to `dest`.
     Otherwise a `ValueError` is raised.
     """
-    mpfs.move(remote_path_list(files), mpremotepath(dest))
+    p = mpremotepath(dest)
+    mpfs.move(remote_path_list(files), p)
+    return p
 
 
 def rm(files: FileList, recursive: bool = False) -> None:
