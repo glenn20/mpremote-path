@@ -1,12 +1,24 @@
-# mpremote-path
+# `mpremote_path` - a pathlib interface for files on micropython boards
 
-Provides a [`pathlib`](https://docs.python.org/3/library/pathlib.html)
-compatible interface to access and manipulate files on a serial-attached
+Provides a convenient,
+[`pathlib`](https://docs.python.org/3/library/pathlib.html) compatible python
+interface to access and manipulate files on a serial-attached
 [micropython](https://github.com/micropython/micropython) board from the host
-computer. **mpremote-path** is built on the file access features of the
+computer. **mpremote-path** provides the `MPRemotePath` class which implements a
+`pathlib.Path` compatible interface to the file access features of the
 [mpremote](https://docs.micropython.org/en/latest/reference/mpremote.html) tool.
 
-**Contents: [Features](#features) | [Installation](#installation) | [API Docs](#api-docs-mpremote_path-module)**
+**Contents:**
+
+**[`mpremote_path`](#features) module: [Features](#features) | [Installation](#installation) | [API Docs](#api-docs-mpremote_path-module)**
+
+**[`mpremote_path.util.mpfs`](#mpremote_pathutilmpfs-module) module:
+[Features](#mpfs-features) | [API Docs -
+Functions](#mpremote_pathutilmpfs-functions)**
+
+**[`mpremote_path.util.mpfsops`](#mpremote_pathutilmpfsops-module) module:
+[Features](#mpfsops-features) | [API Docs -
+Functions](#mpremote_pathutilmpfsops-functions)**
 
 ## Features
 
@@ -36,7 +48,7 @@ d.rmdir()                           # Delete /data
 print([str(f) for f in MPath("/lib").rglob("*.py")])  # Print name of all python files in subdirs of /lib
 ```
 
-- inherits from `PosixPath` class, so code which works on `Path` objects will
+- inherits from `pathlib.PosixPath` class, so code which works on `Path` objects will
   also work transparently on `MPRemotePath` objects, eg:
 
 ```py
@@ -57,13 +69,13 @@ def rcopy(src: Path, dst: Path) -> None:
 MPath.connect("u0")               # Use device attached to /dev/ttyUSB0
 
 # Make a local copy of a directory
-rcopy(Path("./app"), Path("../app-backup"))
+rcopy(Path("app"), Path("../app-backup"))
 
 # Copy local directory to the micropython board
-rcopy(Path("./app"), MPath("/lib/app"))
+rcopy(Path("app"), MPath("/lib/app"))
 
 # Copy a directory from the micropython board to the local disk
-rcopy(MPath("/lib"), Path("./lib"))
+rcopy(MPath("/lib"), Path("./lib2"))
 ```
 
 ## Installation
@@ -137,7 +149,7 @@ tests/test_recursive_copy.py::test_recursive_rm PASSED                   [100%]
     `MPRemotePath`). (See [`pathlib.Path`](
     https://docs.python.org/3/library/pathlib.html#pathlib.Path))
 
-#### Additional methods (nor present in ordinary `Path` instances)
+#### Additional methods (not present in ordinary `Path` instances)
 
 - Classmethod: **`connect(port: str | Board | SerialTransport) -> None`**
 
@@ -145,7 +157,9 @@ tests/test_recursive_copy.py::test_recursive_rm PASSED                   [100%]
     be of type:
     - `str`: the name of a serial port (full or abbreviated), eg:
       `"/dev/ttyUSB0"` or `"u0"`,
-    - `SerialTransport`: the mpremote interface to the micropython board, or
+    - `SerialTransport`: the
+      [mpremote](https://docs.micropython.org/en/latest/reference/mpremote.html)
+      interface to the micropython board, or
     - `mpremote_path.Board`: a wrapper for the `SerialTransport` interface.
 
     This method must be called before any methods that attempt to interact with
@@ -162,7 +176,8 @@ tests/test_recursive_copy.py::test_recursive_rm PASSED                   [100%]
 
   - Make a copy (named `target`) of a file on the micropython board. `target`
     may be the name of the target file (`str`) or another `MPRemotePath`
-    instance.
+    instance. This provides the equivalent of `os.copyfile()` for files on the
+    micropython board.
 
 - Method: **`copy(target: MPRemotePath | str) -> MPRemotePath`**
 
@@ -202,6 +217,237 @@ tests/test_recursive_copy.py::test_recursive_rm PASSED                   [100%]
     - `chmod()`, `lchmod()`, `open()`, `read_link()`, `symlimk_to(target)`,
       `hardlink_to(target)`
 
-## `mpremote_path.utils` module
+## `mpremote_path.util.mpfs` module
 
+**WARNING: This API is a work-in-progress and subject to wholsesale change.**
+
+### `mpfs` Features
+
+Provides utility functions for working with files on a serial-attached
+micropython board.
+
+```py
+from pathlib import Path
+from mpremote_path import MPath
+from mpremote_path.util import mpfs as fs
+
+fs.connect("u0")                 # Use device attached to /dev/ttyUSB0
+
+fs.mkdir("/app")
+fs.put(["app/data", "app/*.py"], "/app") # Copy app files to the board
+fs.get("/app/data/*", "./backup/data")  # Copy data files from board to local backup
+
+fs.mv("/app/main.py", "/")              # Move main.py from app dir on board to /main.py
+fs.mkdir("/app/backup")                 # Create a backup dir on the board
+fs.cp("/app/*.py", "/app/backup")       # Copy the .py files to backup dir on board
+
+fs.touch("/timestamp.dat")              # Create or update timestamp file
+fs.rm("/lib/*.py")                      # Delete all .py files in /lib
+fs.rm("/app", recursive=True)           # Delete the app directory and subdirs
+
+fs.ls(remote, recursive=True)           # Print a listing of files in the app dir
+fs.ls("/", long=True, recursive=True)   # Print a long-form listing
+```
+
+### Function Arguments
+
+Many of these functions take a list of files, `FileList`, as one of their
+arguments, eg. `fs.ls(), fs.put(), fs.get(), fs.cp(), fs.ls()`. A `FileList` can
+be any one of:
+
+- `Iterable[MPRemotePath | Path]`: eg. a list of file path instances,
+- `Iterable[str]`: eg. a list of filenames (or wildcard patterns),
+- `MPRemotePath | Path`: A single instance of a local or remote file path, or
+- `str`: a whitespace separated list of filenames (or wildcard patterns)
+
+If the function expects **local** file paths, string filenames will be
+converted to `Path` instances, eg. the first argument of `put(files, dest)`.
+
+If the function expects **remote** file paths, string filenames will be
+converted to `MPRemotePath` instances, eg. the first arguments of
+`get(files, dest)`, `ls(files)`, `cp(files, dest)`and `mv(files, dest)`.
+
+### `mpremote_path.util.mpfs` Functions
+
+**WARNING: This API is a work-in-progress and subject to wholsesale change.**
+
+- **`connect(port: str) -> None`**
+
+  - Establish a connection to the serial-attached micropython board. `port` is
+    the name of a serial port (full or abbreviated), eg: `"/dev/ttyUSB0"` or
+    `"u0"`, This function must be called before any methods that attempt to
+    interact with the micropython board.
+
+- **`mkdir(name: str) -> MPRemotePath`**
+
+  - Create and return a directory on the micropython board.
+
+- **`rmdir(name: str) -> None`**
+
+  - Delete a directory on the micropython board (directory must be empty).
+
+- **`cd(name: str) -> MPRemotePath`**
+
+  - Set the working directory on the board to `name` and return the fully
+    resolved path.
+
+- **`cwd(name: str) -> MPRemotePath`**
+
+  - Return the current working directory on the board.
+
+- **`touch(name: str) -> MPRemotePath`**
+
+  - Create a regular file on the micropython board. If the file exists, update
+    the timestamp on the file.
+
+- **`cat(files: FileList) -> None`**
+
+  - Print out the contents of the files provided.
+
+- **`rm(files: FileList, recursive: bool = False) -> None`**
+
+  - Delete files and directories. Will delete contents of directories if
+    `recursive` is set `True`.
+
+- **`put(files: FileList, dest: MPRemotePath | str) -> MPRemotePath`**
+
+  - Recursively copy all the local files and directories specified in `files`
+    into the remote `dest` directory on the micropython board. The files
+    specified in `files` and `dest` may be `Path` instances or `str` values
+    (including glob patterns). Filenames provided as strings will be converted
+    to local `Path` instances.
+
+    Returns the destination directory as a `MPRemotePath` instance.
+
+- **`get(files: FileList, dest: Path | str) -> Path`**
+
+  - Recursively copy all the remote files and directories specified in `files`
+    into the local `dest` directory. The files specified in `files` and `dest`
+    may be `MPRemotePath` instances or `str` values (including glob patterns).
+    Filenames provided as strings will be converted to local `MPRemotePath`
+    instances.
+
+    Returns the destination directory as a `Path` instance.
+
+- **`mv(files: FileList, dest: MPRemotePath | str) -> MPRemotePath`**
+
+  - Move files and directories on the board (specified in `files`) into the
+    `dest` directory on the board. The files specified in `FileList` and `dest`
+    may be `MPRemotePath` instances or `str` values (including glob patterns).
+    Filenames provided as strings will be converted to `MPRemotePath` instances.
+
+    Returns the destination directory as a `MPRemotePath` instance.
+
+- **`cp(files: FileList, dest: MPRemotePath | str) -> MPRemotePath`**
+
+  - Recursively copy files and directories on the board (specified in `files`)
+    into the `dest` directory on the board. The files specified in `files`
+    and `dest` may be `MPRemotePath` instances or `str` values (including glob
+    patterns). Filenames provided as strings will be converted to `MPRemotePath`
+    instances.
+
+    Returns the destination directory as a `MPRemotePath` instance.
+
+
+## `mpremote_path.util.mpfsops` module
+
+**WARNING: This API is a work-in-progress and subject to wholsesale change.**
+
+### `mpfsops` Features
+
+Provides utility functions for working with files on a serial-attached
+micropython board. These provide the underlying functionality used by the `mpfs`
+module.
+
+These functions accept `pathlib.Path` instances as arguments (including
+`MPRemotePath` instances). They work transparently with local files and files on
+a micropython board. *Be careful that you know which files you are working
+with!!!*
+
+```py
+from pathlib import Path
+from mpremote_path import MPath
+from mpremote_path.util import mpfsops as fsops
+
+fsops.connect("u0")                 # Use device attached to /dev/ttyUSB0
+
+# Make a local copy of a local file (like `os.copyfile()`)
+fsops.copyfile(Path("main.py"), Path("main-backup.py"))
+# Copy a local file to the board
+fsops.copyfile(Path("main.py"), MPath("/main.py"))
+# Make a remote copy of a remote file on the board
+fsops.copyfile(MPath("/main.py"), MPath("/main-backup.py"))
+# Make a local copy of a remote file on the board
+fsops.copyfile(MPath("/boot.py"), Path("boot.py"))
+
+local = Path("app")                     # Directory on local host
+remote = MPath("/app")                  # Directory on micropython board
+remote.mkdir()
+
+# Recursively copy app files to the board
+fsops.copy([local / "data", local.glob("*.py")], remote)
+# Recursively copy files from the board to a local directory
+fsops.copy([remote / "data"], local)
+
+# Move main.py from app dir on board to /main.py
+fsops.move([remote / "main.py"], MPath("/"))
+
+fsops.remove(remote.glob("*.py"))       # Delete all .py files in /app on board
+fsops.remove([MPath("/app")], recursive=True) # Delete the app directory and subdirs
+```
+
+### `mpremote_path.util.mpfsops` Functions
+
+**WARNING: This API is a work-in-progress and subject to wholsesale change.**
+
+- **`connect(port: str) -> None`**
+
+  - Establish a connection to the serial-attached micropython board. `port` is
+    the name of a serial port (full or abbreviated), eg: `"/dev/ttyUSB0"` or
+    `"u0"`, This function must be called before any methods that attempt to
+    interact with the micropython board.
+
+- **`copyfile(src: Path, dest: Path) -> Path | None`**
+
+  - Create a new file `dest` which is a copy of the `src` file. `src` and `dest`
+    may be `pathlib.Path` instances (representing a local file on the computer)
+    OR `MPRemotePath` instances (representing files on the micropython board).
+    `copyfile()` will use the most efficient way to copy the files to/from the
+    board if required.
+
+- **`copy(files: Iterable[Path], dest: Path) -> None`**
+
+  - Recursively copy files and directories from `files` to `dest`. `files` is a
+    list (or other iterable) of `Path` instances (which may also be
+    `MPRemotePath` instances - representing files and direcories on the board).
+
+    If `dest` is an existing directory (local or remote), all the files and dirs
+    in the `files` list will be recursively copied into `dest`.
+
+    If `dest` is **not** an existing directory **and** there is only one file or
+    dir in `files`, the file/dir in `files` will be copied to a new file/dir
+    named `dest`. (This is similar to how the unix `cp` command operates.)
+
+- **`move(files: Iterable[Path], dest: Path) -> None`**
+
+  - Recursively move files and directories from `files` to `dest`. `files` is a
+    list (or other iterable) of `Path` instances (which may also be
+    `MPRemotePath` instances - representing files and direcories on the board).
+
+    If `dest` is an existing directory (local or remote), all the files and dirs
+    in the `files` list will be recursively moved into `dest`.
+
+    If `dest` is **not** an existing directory **and** there is only one file or
+    dir in `files`, that file/dir in `files` will be renamed to `dest`. (This is
+    similar to how the unix `mv` command operates.)
+
+- **`remove(files: Iterable[Path], recursive: bool = False) -> None`**
+
+  - Recursively (optionally) delete files and directories provided in `files`.
+    `files` is a list (or other iterable) of `Path` instances (which may also be
+    `MPRemotePath` instances - representing files and direcories on the board).
+
+    If `recursive` is `True`, recursively delete any files and subdirectories
+    inside directories to be deleted. If `recursive` is `False`, raise an
+    exception if attempting to remove a directory that is not empty.
 
