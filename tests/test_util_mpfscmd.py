@@ -2,7 +2,7 @@ from pathlib import Path
 
 from common import check_folders
 from mpremote_path import MPRemotePath as MPath
-from mpremote_path.util import mpfscmd as fscmd
+from mpremote_path.util import mpfs as fscmd
 
 # The `root` fixture saves the current working directory, cd's to the root
 # folder and passes in the path of the root directory of the micropython board.
