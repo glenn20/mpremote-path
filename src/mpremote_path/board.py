@@ -104,7 +104,7 @@ class Board:
 
     Access to the mpremote SerialTransport instance is mediated via the
     `raw_repl()` context manager, which ensures a raw repl is always active when
-    in use and handles errors returned by micropython: eg.
+    in use and handles exceptions thrown by micropython: eg.
         `with board.raw_repl() as r: r.exec("print('Hello world')")`
 
     Board also provides convenience wrappers and methods for executing code on

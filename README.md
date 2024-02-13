@@ -348,7 +348,6 @@ converted to `MPRemotePath` instances, eg. the first arguments of
 
     Returns the destination directory as a `MPRemotePath` instance.
 
-
 ## `mpremote_path.util.mpfsops` module
 
 **WARNING: This API is a work-in-progress and subject to wholsesale change.**
@@ -450,4 +449,3 @@ fsops.remove([MPath("/app")], recursive=True) # Delete the app directory and sub
     If `recursive` is `True`, recursively delete any files and subdirectories
     inside directories to be deleted. If `recursive` is `False`, raise an
     exception if attempting to remove a directory that is not empty.
-

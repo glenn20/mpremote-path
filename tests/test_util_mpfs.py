@@ -1,115 +1,129 @@
 from pathlib import Path
 
 from common import check_folders
-
 from mpremote_path import MPRemotePath as MPath
-from mpremote_path.util import mpfsops
+from mpremote_path.util import mpfs as fscmd
 
 # The `root` fixture saves the current working directory, cd's to the root
 # folder and passes in the path of the root directory of the micropython board.
 # The original working directory will be restored when the fixture is torn down.
-
-# The `testdir` fixture passes in a directory for testing without creating the
-# directory.
 
 # The `testfolder` fixture creates a directory on the board for running tests
 # and passes in the path of the directory. The folder will be deleted when the
 # test fixture is torn down.
 
 
-def copyfile_check(src: Path, dest: Path) -> None:
-    assert (src.exists(), dest.exists()) == (True, False)
-    mpfsops.copyfile(src, dest)
-    assert (src.exists(), dest.exists()) == (True, True)
-    assert dest.stat().st_size == src.stat().st_size
-    assert dest.read_bytes() == src.read_bytes()
+def test_touch(testfolder: MPath) -> None:
+    "Test creating a file"
+    name = "test1.file"
+    p = fscmd.touch(name)
+    assert p.is_file() is True
+    assert MPath(name).is_file() is True
 
 
-def test_copyfile(testfolder: MPath, localdata: Path) -> None:
-    "Test copying files to and from the board."
-    src, dest = Path("./lib/ota/status.py"), MPath("status.py")
-    copyfile_check(src, dest)  # Copy local to the board
-    dest2 = MPath("status2.py")
-    copyfile_check(dest, dest2)  # Make a second copy on the board
-    dest3 = Path("status3.py")
-    copyfile_check(dest2, dest3)  # Copy from the board to a local file
-    dest4 = Path("status4.py")
-    copyfile_check(dest3, dest4)  # Make a second local copy
-    for f in (dest, dest2, dest3, dest4):
-        f.unlink()  # Clean up
+def test_rmfile(testfolder: MPath) -> None:
+    "Test deleting a file"
+    name = "test1.file"
+    p = fscmd.touch(name)
+    assert p.is_file() is True
+    fscmd.rm(name)
+    assert MPath(name).exists() is False
 
 
-def test_copypath(testfolder: MPath, localdata: Path) -> None:
-    "Test recursively copying a local file/dir to the micropython board."
-    src, dest = Path("./lib"), MPath("./lib")
-    assert (src.exists(), dest.exists()) == (True, False)
-    mpfsops.copypath(src, dest)
-    assert (dest.exists(), dest.is_dir(), dest.is_file()) == (True, True, False)
+def test_mkdir(testfolder: MPath) -> None:
+    "Test creating a directory"
+    name = "test1.folder"
+    p = fscmd.mkdir(name)
+    assert p.is_dir() is True
+    assert MPath(name).is_dir() is True
 
 
-def test_rcopy(testfolder: MPath, localdata: Path) -> None:
-    "Test recursively copying local files/dirs to the micropython board."
-    src, dest = Path("./lib"), MPath("./lib2")
-    assert (src.exists(), dest.exists()) == (True, False)
-    mpfsops.rcopy(src, dest)
-    assert (dest.exists(), dest.is_dir(), dest.is_file()) == (True, True, False)
+def test_rmdir(testfolder: MPath) -> None:
+    "Test deleting a directory"
+    name = "test1.folder"
+    p = fscmd.mkdir(name)
+    assert p.is_dir() is True
+    fscmd.rmdir(name)
+    q = MPath(name)
+    assert q.exists() is False
 
 
-def test_copy_file(testfolder: MPath, localdata: Path) -> None:
-    "Test copying a local file to the micropython board."
-    src, dest = Path("./lib/ota/status.py"), MPath("status.py")
-    assert (src.exists(), dest.exists()) == (True, False)
-    mpfsops.copy([src], dest)
-    assert (dest.exists(), dest.is_dir(), dest.is_file()) == (True, False, True)
+def test_cd_cwd(testfolder: MPath) -> None:
+    "Test changing directories"
+    name = "testcd.folder"
+    p = fscmd.mkdir(name)
+    assert p.is_dir() is True
+    p2 = fscmd.cd(name)
+    assert (
+        fscmd.cwd().as_posix()
+        == (testfolder / name).as_posix()
+        == p2.resolve().as_posix()
+    )
 
 
-def test_copy_folder(testfolder: MPath, localdata: Path) -> None:
-    "Test recursively copying local files to the micropython board."
-    src, dest = Path("./lib"), MPath(".")
-    assert (src.exists(), dest.exists()) == (True, True)
-    mpfsops.copy([src], dest)
-    check_folders(src, dest / src.name)
+def test_cp_file(testfolder: MPath) -> None:
+    "Test make a copy of a file onm the board."
+    src, dst = "test1.file", "test2.file"
+    p = MPath(src)
+    assert p.exists() is False
+    msg = "Hello world\n"
+    p.write_text(msg)
+    assert p.is_file() is True
+    fscmd.cp(src, dst)
+    q = MPath(dst)
+    assert q.exists() is True
+    assert q.read_text() == msg
 
 
-def test_remove_file(testfolder: MPath, localdata: Path) -> None:
-    "Test deleting files on board."
-    src, dest = Path("./lib/ota/status.py"), MPath("status.py")
-    assert (src.exists(), dest.exists()) == (True, False)
-    mpfsops.copy([src], dest)
-    assert (dest.exists(), dest.is_dir(), dest.is_file()) == (True, False, True)
-    mpfsops.remove([dest])
-    assert (dest.exists(), dest.is_dir(), dest.is_file()) == (False, False, False)
+def test_put_file(testfolder: MPath, localdata: Path) -> None:
+    "Test copy file to board"
+    src, dst = "./lib/ota/status.py", "./status2.py"
+    fscmd.put(src, dst)
+    assert MPath(dst).read_text() == Path(src).read_text()
 
 
-def test_remove_folder(testfolder: MPath, localdata: Path) -> None:
-    "Test deleting folders on board."
-    src, dest = Path("./lib"), MPath("./lib2")
-    assert (src.exists(), dest.exists()) == (True, False)
-    mpfsops.rcopy(src, dest)
-    assert (dest.exists(), dest.is_dir(), dest.is_file()) == (True, True, False)
-    mpfsops.remove([dest], recursive=True)
-    assert (dest.exists(), dest.is_dir(), dest.is_file()) == (False, False, False)
+def test_put_dir(testfolder: MPath, localdata: Path) -> None:
+    "Test copy directory and contents to board."
+    src, dst = "lib", "."
+    fscmd.put(src, dst)
+    p = Path(src)
+    check_folders(p, MPath(dst) / p.name)
 
 
-def test_move_file(testfolder: MPath, localdata: Path) -> None:
-    "Test renaming files on the board."
-    src, dest = Path("./lib/ota/status.py"), MPath("status.py")
-    assert (src.exists(), dest.exists()) == (True, False)
-    mpfsops.copy([src], dest)
-    assert (dest.exists(), dest.is_dir(), dest.is_file()) == (True, False, True)
-    dest2 = MPath("status2.py")
-    mpfsops.move([dest], dest2)
-    assert (dest.exists(), dest.is_dir(), dest.is_file()) == (False, False, False)
-    assert (dest2.exists(), dest2.is_dir(), dest2.is_file()) == (True, False, True)
+def test_put_glob(testfolder: MPath, localdata: Path) -> None:
+    "Test copy file by globbing to board"
+    src, dst = "./lib/ota/*.py", "."
+    fscmd.put(src, dst)
+    q = MPath(dst)
+    for p in Path("./lib/ota").glob("*.py"):
+        assert p.read_text() == (q / p.name).read_text()
 
 
-def test_move_folder(testfolder: MPath, localdata: Path) -> None:
-    "Test renaming folders on the board."
-    src, dest = Path("./lib"), MPath("lib")
-    assert (src.exists(), dest.exists()) == (True, False)
-    mpfsops.rcopy(src, dest)
-    assert (dest.exists(), dest.is_dir(), dest.is_file()) == (True, True, False)
-    dest2 = MPath("lib2")
-    mpfsops.move([dest], dest2)
-    assert (dest.exists(), dest.is_dir(), dest.is_file()) == (False, False, False)
-    assert (dest2.exists(), dest2.is_dir(), dest2.is_file()) == (True, True, False)
+def test_get_file(testfolder: MPath, localdata: Path) -> None:
+    "Test copy file from board"
+    src, dst = "test1", "test2"
+    msg = "Hello world\n"
+    MPath(src).write_text(msg)
+    fscmd.get(src, dst)
+    assert Path(dst).read_text() == MPath(src).read_text()
+
+
+def test_get_dir(testfolder: MPath, localdata: Path) -> None:
+    "Test copy directory and contents from board"
+    src, dst, dst2 = "lib", ".", "test2"
+    fscmd.put(src, dst)
+    q = Path(dst2)
+    q.mkdir()
+    fscmd.get(src, dst2)
+    check_folders(MPath(src), q / src)
+
+
+def test_get_glob(testfolder: MPath, localdata: Path) -> None:
+    "Test copy file globs from board"
+    src, dst, dst2 = "lib", ".", "test2"
+    fscmd.put(src, dst)
+    q = Path(dst2)
+    q.mkdir()
+    fscmd.get("lib/ota/*.py", dst2)
+    for p in Path("./lib/ota").glob("*.py"):
+        assert p.read_text() == (q / p.name).read_text()
