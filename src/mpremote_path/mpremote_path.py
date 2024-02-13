@@ -20,6 +20,7 @@ from mpremote.transport_serial import SerialTransport
 
 from .board import Board, make_board
 
+# Code which will be run on the micropython board when we connect to it
 START_CODE = """
 def _ils(p):
   for f in os.ilistdir(p):print(f, end=',')
@@ -27,7 +28,15 @@ def _ils(p):
 
 
 def mpremotepath(f: str | Path) -> MPRemotePath:
+    """If `f` is an `MPRemotePath` instance return it, else convert to
+    `MPRemotePath` and return it."""
     return f if isinstance(f, MPRemotePath) else MPRemotePath(f)
+
+
+def is_wildcard_pattern(pat: str) -> bool:
+    """Whether this pattern needs actual matching using `glob()`, or can
+    be looked up directly as a file."""
+    return "*" in pat or "?" in pat or "[" in pat
 
 
 class MPRemoteDirEntry:
@@ -36,6 +45,8 @@ class MPRemoteDirEntry:
     Will be initialised from the results of calling `os.ilistdir()` on the
     micropython board. This is used to support the `iterdir()`, `_scandir()`,
     `glob()` and `rglob()` methods of `pathlib.Path` for `MPRemotePath`s."""
+
+    __slots__ = ("parent", "name", "_stat")
 
     def __init__(
         self,
@@ -69,21 +80,20 @@ class MPRemoteDirEntry:
         return stat.S_ISLNK(self._stat.st_mode)
 
     def stat(self, *, follow_symlinks: bool = True) -> os.stat_result:
-        if self._stat is None:  # or self._stat.st_mtime == 0:
-            if not MPRemotePath.board:
-                raise ValueError("MPRemotePath.connect() must be called before use.")
-            if self._stat is None:  # Get the full os.stat() result
-                self._stat = MPRemotePath.board.fs_stat(self.path)
-            else:  # We already have everything except the mtime so just fetch that
-                mtime = MPRemotePath.board.eval(f"os.stat({self.path!r})[8]")
-                self._stat = os.stat_result(self._stat[:7] + (mtime, mtime, mtime))
+        if not MPRemotePath.board:
+            raise ValueError("MPRemotePath.connect() must be called before use.")
+        if self._stat is None:  # Get the full os.stat() result
+            self._stat = MPRemotePath.board.fs_stat(self.path)
+        if self._stat.st_mtime == 0:  # Fetch the mtime from the board
+            mtime = MPRemotePath.board.eval(f"os.stat({self.path!r})[8]")
+            self._stat = os.stat_result(self._stat[:7] + (mtime, mtime, mtime))
         return self._stat
 
 
 # Paths on the board are always Posix paths even if local host is Windows.
 class MPRemotePath(PosixPath):
     "A `pathlib.Path` compatible class to hold details of files on the board."
-    slots = ("_stat", "board")
+    # __slots__ = ("_stat", "board")
     board: Board
     _stat: os.stat_result | None
     _drv: str  # Declare types for properties inherited from pathlib classes
@@ -94,13 +104,39 @@ class MPRemotePath(PosixPath):
         if not cls.board:
             raise ValueError("Must call MPRemotePath.connect() before use.")
         self = cls._from_parts(args)  # type: ignore
-        self.board = self.__class__.board
         return self
 
     def __init__(self, *args) -> None:
+        self.board = self.__class__.board
         self._stat = None
 
     # Additional convenience methods for MPRemotePath
+    @classmethod
+    def connect(
+        cls,
+        port: str | Board | SerialTransport,
+        baud: int = 115200,
+        wait: int = 0,
+        *,
+        set_clock: bool = False,
+        utc: bool = False,
+    ) -> None:
+        """Connect to the micropython board on the given `port`.
+        - `port` can be a `Board` instance, an mpremote `SerialTransport`
+          instance or a string containing the full or abbreviated name of the
+          serial port
+        - `baud` is the baud rate to use for the serial connection
+        - `wait` is the number of seconds to wait for the board to become
+          available.
+        - `set_clock` is a boolean indicating whether to synchronise the board
+          clock with the host clock.
+        - `utc` is a boolean indicating whether to use UTC for the board clock.
+
+        `baud` and `wait` are only used if `port` is a string.
+        """
+        cls.board = make_board(port, baud, wait, set_clock=set_clock, utc=utc)
+        cls.board.exec(START_CODE)
+
     def chdir(self) -> MPRemotePath:
         "Set the current working directory on the board to this path." ""
         p = self.resolve()
@@ -121,51 +157,31 @@ class MPRemotePath(PosixPath):
         return self.copyfile(target)
 
     @classmethod
-    def connect(
-        cls,
-        port: str | Board | SerialTransport,
-        baud: int = 115200,
-        wait: int = 0,
-        *,
-        set_clock: bool = False,
-        utc: bool = False,
-    ) -> None:
-        """Connect to the micropython board on the given `port`.
-        - `port` can be a `Board` instance, an mpremote `SerialTransport`
-          instance or a string containing the full or abbreviated name of the
-          serial port
-        - `baud` is the baud rate to use for the serial connection
-        - `wait` is the number of seconds to wait for the board to become
-          available.
-        - `set_clock` is a boolean indicating whether to synchronise the board
-          clock with the host clock.
-        - `utc` is a boolean indicating whether to use UTC for the board clock
-        `baud` and `wait` are only used if `port` is a string.
-        """
-        cls.board = make_board(port, baud, wait, set_clock=set_clock, utc=utc)
-        cls.board.exec(START_CODE)
-
-    # Overrides for pathlib.Path methods
-    @classmethod
     def cwd(cls) -> MPRemotePath:
         if not cls.board:
             raise ValueError("RemotePath.board must be set before use.")
         return cls(cls.board.eval("os.getcwd()"))
 
+    # Overrides for pathlib.Path methods
     @classmethod
     def home(cls) -> MPRemotePath:
         return cls("/")
 
-    def samefile(self, other: Path | str) -> bool:
-        if isinstance(other, str):
-            other = MPRemotePath(other)
-        return isinstance(other, MPRemotePath) and self.resolve() == other.resolve()
+    # Path.glob(), Path.rglob(), Path.walk() and Path.iterdir() rely on _scandir()
+    @contextmanager
+    def _scandir(self) -> Generator[Iterable[MPRemoteDirEntry], None, None]:
+        """Override for Path._scandir(): returns a context manager which produces an
+        iterable of information about the files in a folder. This is used by
+        `glob()`, `rglob()` and `walk()`."""
+        dirname = str(self)
+        files = self.board.exec_eval(f"_ils('{dirname}')") or tuple()
+        yield [MPRemoteDirEntry(dirname, name, *extra) for name, *extra in files]
 
     def _from_direntry(self, entry: MPRemoteDirEntry) -> MPRemotePath:
         """Create a new `MPRemotePath` instance from a `MPRemoteDirEntry`
         object. The file `stat()` information from the `direntry` is cached in
         the new instance."""
-        p = self._make_child_relpath(entry.name)  # type: ignore
+        p: MPRemotePath = self._make_child_relpath(entry.name)  # type: ignore
         p._stat = entry.stat()
         return p
 
@@ -173,29 +189,10 @@ class MPRemotePath(PosixPath):
         with self._scandir() as it:
             return (self._from_direntry(f) for f in it)
 
-    # `rglob()` calls `_scandir()` twice in a row for each dir, so cache the
-    # results from the board.
-    # TODO: replace with real caching.
-    # @lru_cache(maxsize=1)
-    def _ilistdir(self) -> Iterable[MPRemoteDirEntry]:
-        """Return an iterable of `MPRemoteDirEntry` objects for the files in a
-        directory on the micropython `board`."""
-        # exec_eval() will return None if the directory is empty
-        ls = self.board.exec_eval(f"_ils('{self}')") or tuple()
-        return [MPRemoteDirEntry(str(self), name, *extra) for name, *extra in ls]
-
-    # glob(), rglob() and walk() rely on _scandir()
-    @contextmanager
-    def _scandir(self) -> Generator[Iterable[MPRemoteDirEntry], None, None]:
-        """Override for Path._scandir(): a context manager which produces an
-        iterable of information about the files in a folder. This is used by
-        `glob()` and `rglob()`."""
-        yield self._ilistdir()
-
     def resolve(self, strict: bool = False) -> MPRemotePath:
         # The fs on the board has no concept of symlinks, so just eliminate ".."
         # and "." from the absolute path.
-        parts = self._parts if self.is_absolute() else ([self.cwd()] + self._parts)
+        parts = self._parts if self.is_absolute() else (self.cwd()._parts + self._parts)
         new_parts = []
         for p in parts:
             if p == ".." and new_parts:
@@ -204,6 +201,11 @@ class MPRemotePath(PosixPath):
                 new_parts.append(p)
         p = self._from_parts(new_parts)  # type: ignore
         return p if p._parts != self._parts else self
+
+    def samefile(self, other: Path | str) -> bool:
+        if isinstance(other, str):
+            other = MPRemotePath(other)
+        return isinstance(other, MPRemotePath) and self.resolve() == other.resolve()
 
     def stat(self) -> os.stat_result:
         if hasattr(self, "_stat") and self._stat is not None:

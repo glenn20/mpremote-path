@@ -15,7 +15,8 @@ from pathlib import Path
 from typing import Callable, Iterable
 
 from mpremote_path import MPRemotePath as MPath
-from mpremote_path import mpremotepath
+from mpremote_path import is_wildcard_pattern, mpremotepath
+from mpremote_path.mpremote_path import MPRemotePath
 from mpremote_path.util import mpfs
 
 # A list of files and/or directories: [file1, file2, ...]
@@ -38,12 +39,6 @@ def default_path_formatter(path: Path) -> str:
 name_formatter: Callable[[Path], str] = default_name_formatter
 
 path_formatter: Callable[[Path], str] = default_path_formatter
-
-
-def _is_wildcard_pattern(pat):
-    # Whether this pattern needs actual matching using glob(), or can
-    # be looked up directly as a file.
-    return "*" in pat or "?" in pat or "[" in pat
 
 
 def local_path(path: Path | str, cls=Path) -> Path:
@@ -73,9 +68,9 @@ def path_list(files: FileList, cls=Path) -> Iterable[Path]:
     )
     cwd = cls.cwd()  # Current directory: for globbing if required
     for f in filelist:
-        if isinstance(f, str) and _is_wildcard_pattern(f):
+        if isinstance(f, str) and is_wildcard_pattern(f):
             # Expand glob pattern and yield each file
-            yield from cwd.glob(f)
+            yield from list(cwd.glob(f)) or [cls(f)]
         else:
             # Yield the next file - convert to cls if necessary
             yield f if isinstance(f, cls) else cls(f)
