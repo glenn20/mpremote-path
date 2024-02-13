@@ -108,9 +108,7 @@ def localdata() -> Generator[Path, None, None]:
     os.chdir(data_dir)
     rm_recursive(Path("test2"))
     try:
-        yield Path(".").resolve()
+        yield Path.cwd()
     finally:
-        # rm_recursive(Path("test2"))
-        os.chdir(pwd)
-    with suppress(TransportError, OSError):
         rm_recursive(Path("test2"))
+        os.chdir(pwd)
