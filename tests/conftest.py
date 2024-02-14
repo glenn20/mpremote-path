@@ -7,6 +7,7 @@ from typing import Generator
 import pytest
 import yaml
 from mpremote.transport_serial import TransportError
+
 from mpremote_path import MPRemotePath as MPath
 
 test_dir = "/_tests"  # Directory to create for tests on the micropython board.
@@ -76,7 +77,7 @@ def root(pytestconfig) -> Generator[MPath, None, None]:
 
 
 @pytest.fixture()
-def testdir(root: MPath):
+def testdir(root: MPath) -> Generator[MPath, None, None]:
     path, pwd = MPath(test_dir), MPath.cwd()
     yield path
     if pwd:  # Restore the previous working directory and cleanup
