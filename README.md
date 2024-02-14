@@ -91,6 +91,12 @@ If you use a python virtual environment (recommended), make sure it is active.
 
 To install in your python environment:
 
+- Prerequisites (`mpremote`):
+
+  ```bash
+  pip install -r requirements.txt
+  ```
+
 - Install in ["editable
   mode"](https://setuptools.pypa.io/en/latest/userguide/development_mode.html):
 
