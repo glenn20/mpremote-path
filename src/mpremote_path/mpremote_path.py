@@ -46,10 +46,11 @@ class MPRemoteDirEntry:
     micropython board. This is used to support the `iterdir()`, `_scandir()`,
     `glob()` and `rglob()` methods of `pathlib.Path` for `MPRemotePath`s."""
 
-    __slots__ = ("parent", "name", "_stat")
+    __slots__ = ("parent", "name", "_stat", "_board")
 
     def __init__(
         self,
+        board: Board,
         parent: str,
         name: str,
         mode: int = 0,
@@ -59,13 +60,14 @@ class MPRemoteDirEntry:
     ) -> None:
         self.name: str = name
         self.parent: str = parent
+        self._board: Board = board
         self._stat: os.stat_result = os.stat_result(
             (mode, inode, 0, 0, 0, 0, size, mtime, mtime, mtime)
         )
 
     @property
     def path(self) -> str:
-        return f"{self.parent}/{self.name}"
+        return f"{self.parent.rstrip('/')}/{self.name}"
 
     def inode(self) -> int:
         return self._stat.st_ino
@@ -80,13 +82,11 @@ class MPRemoteDirEntry:
         return stat.S_ISLNK(self._stat.st_mode)
 
     def stat(self, *, follow_symlinks: bool = True) -> os.stat_result:
-        if not MPRemotePath.board:
-            raise ValueError("MPRemotePath.connect() must be called before use.")
         if self._stat is None:  # Get the full os.stat() result
-            self._stat = MPRemotePath.board.fs_stat(self.path)
-        if self._stat.st_mtime == 0:  # Fetch the mtime from the board
-            mtime = MPRemotePath.board.eval(f"os.stat({self.path!r})[8]")
-            self._stat = os.stat_result(self._stat[:7] + (mtime, mtime, mtime))
+            self._stat = self._board.fs_stat(self.path)
+            if self._stat.st_mtime == 0:  # Fetch the mtime from the board
+                mtime = self._board.eval(f"os.stat({self.path!r})[8]")
+                self._stat = os.stat_result(self._stat[:7] + (mtime, mtime, mtime))
         return self._stat
 
 
@@ -174,14 +174,19 @@ class MPRemotePath(PosixPath):
         iterable of information about the files in a folder. This is used by
         `glob()`, `rglob()` and `walk()`."""
         dirname = str(self)
-        files = self.board.exec_eval(f"_ils('{dirname}')") or tuple()
-        yield [MPRemoteDirEntry(dirname, name, *extra) for name, *extra in files]
+        with self.board.raw_repl():  #  Wrap all the file ops in a single raw repl
+            files = self.board.exec_eval(f"_ils('{dirname}')") or tuple()
+            yield [
+                MPRemoteDirEntry(self.board, dirname, name, *extra)
+                for name, *extra in files
+            ]
 
     def _from_direntry(self, entry: MPRemoteDirEntry) -> MPRemotePath:
         """Create a new `MPRemotePath` instance from a `MPRemoteDirEntry`
         object. The file `stat()` information from the `direntry` is cached in
         the new instance."""
         p: MPRemotePath = self._make_child_relpath(entry.name)  # type: ignore
+        p.board = self.board
         p._stat = entry.stat()
         return p
 
