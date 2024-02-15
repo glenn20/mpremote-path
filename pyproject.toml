@@ -20,6 +20,9 @@ dynamic = ["dependencies", "version"]
 [tool.hatch.version]
 path = "src/mpremote_path/__init__.py"
 
+[project.scripts]
+mpfs = "mpremote_path.util.mpfs:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/mpremote_path"]
 
