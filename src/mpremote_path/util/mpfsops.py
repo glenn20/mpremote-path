@@ -27,11 +27,11 @@ def connect(*args, **kwargs) -> None:
     MPath.connect(*args, **kwargs)
 
 
-def copyfile(src: Path, dst: Path) -> Path | None:
+def copyfile(src: Path, dst: Path) -> Path:
     """Copy a regular file, with optimisations for mpremote paths.
     `src` and `dst` can be either `Path` or `MPRemotePath` instances."""
     if not src.is_file():
-        return None  # skip non regular files
+        raise ValueError(f"'{src}' is not a regular file")
     elif isinstance(src, MPath) and isinstance(dst, MPath):
         with src.board.raw_repl() as r:
             r.fs_cp(str(src), str(dst))  # Both files are on the micropython board
@@ -48,19 +48,20 @@ def copyfile(src: Path, dst: Path) -> Path | None:
     return dst
 
 
-def copypath(src: Path, dst: Path) -> Path | None:
+def copypath(src: Path, dst: Path) -> Path:
     """Copy a file or directory.
     If `src` is a regular file, call `copyfile()` to copy it to `dst`.
     If `src` is a directory, and `dst` is not a directory, make the new
     directory.
     Returns `dst` if successful, otherwise returns `None`."""
-    if src.is_file():
+    if src.is_dir():
+        print(f"{src}/ -> {dst}/")
+        if not dst.is_dir():
+            dst.mkdir()  # "Copy" by creating the destination directory
+        return dst
+    else:
         print(f"{src} -> {dst}")
         return copyfile(src, dst)
-    print(f"{src}/ -> {dst}/")
-    if not dst.is_dir():
-        dst.mkdir()  # "Copy" by creating the destination directory
-    return dst
 
 
 def rcopy(src: Path, dst: Path) -> None:
