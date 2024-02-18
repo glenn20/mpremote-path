@@ -104,11 +104,9 @@ class MPRemotePath(PosixPath):
         if not cls.board:
             raise ValueError("Must call MPRemotePath.connect() before use.")
         self = cls._from_parts(args)  # type: ignore
-        return self
-
-    def __init__(self, *args) -> None:
         self.board = self.__class__.board
         self._stat = None
+        return self
 
     # Additional convenience methods for MPRemotePath
     @classmethod
