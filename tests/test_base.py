@@ -2,7 +2,6 @@ import stat
 from shutil import SameFileError
 
 import pytest
-
 from mpremote_path import MPRemotePath as MPath
 
 # The `root` fixture saves the current working directory, cd's to the root
@@ -157,6 +156,45 @@ def test_copy_copyfile(testfolder: MPath) -> None:
     p.unlink()
 
 
+def test_open_bytes(testfolder: MPath) -> None:
+    "Test reading and writing bytes to/from files"
+    p = MPath("test1.bytes")
+    assert p.exists() is False
+    msg = b"Hello world\n"
+    f = p.open("wb")
+    f.write(msg)
+    f.close()
+    assert (p.exists(), p.is_dir(), p.is_file()) == (True, False, True)
+    assert p.stat().st_size == len(msg)
+    msg2 = p.read_bytes()
+    assert msg2 == msg
+    f = p.open("rb")
+    msg3 = f.read()
+    f.close()
+    assert msg3 == msg
+    p.unlink()
+    assert p.exists() is False
+
+
+def test_open_text(testfolder: MPath) -> None:
+    "Test reading and writing bytes to/from files"
+    p = MPath("test1.text")
+    assert p.exists() is False
+    msg = "Hello world\n"
+    f = p.open("w")
+    f.write(msg)
+    f.close()
+    assert (p.exists(), p.is_dir(), p.is_file()) == (True, False, True)
+    msg2 = p.read_text()
+    assert msg2 == msg
+    f = p.open("r")
+    msg3 = f.read()
+    f.close()
+    assert msg3 == msg
+    p.unlink()
+    assert p.exists() is False
+
+
 def test_not_implemented(testfolder: MPath) -> None:
     "Test methods that are not implemented."
     p = MPath("test1.touch")
@@ -165,8 +203,6 @@ def test_not_implemented(testfolder: MPath) -> None:
     assert p.exists() is True
     with pytest.raises(NotImplementedError):
         p.chmod(0o777)  # No groups or other permissions on lfs or fat
-    with pytest.raises(NotImplementedError):
-        p.open()  # Not implemented yet - complex to do right
     with pytest.raises(NotImplementedError):
         p.lchmod(0o777)  # No groups or other permissions on lfs or fat
     with pytest.raises(NotImplementedError):

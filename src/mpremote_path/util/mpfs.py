@@ -242,7 +242,7 @@ def cd(name: str) -> MPath:
 
 
 def cwd() -> MPath:
-    """Set the working directory on the micropython board."""
+    """Get the working directory on the micropython board."""
     return MPath.cwd()
 
 

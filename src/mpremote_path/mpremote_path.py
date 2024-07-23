@@ -9,6 +9,7 @@ interface to accessing and manipulating files on micropython boards via the
 # For python<3.10: Allow method type annotations to reference enclosing class
 from __future__ import annotations
 
+import io
 import os
 import stat
 from contextlib import contextmanager
@@ -82,6 +83,22 @@ class MPRemoteDirEntry:
                 mtime = self._board.eval(f"os.stat({self.path!r})[8]")
                 self._stat = os.stat_result(self._stat[:7] + (mtime, mtime, mtime))
         return self._stat
+
+
+class PathWriter(io.BytesIO):
+    """File object that flushes its contents to a micropython file on close.
+    Returned by MPRemotePath.open(mode="w").
+    """
+
+    def __init__(self, board: Board, path: str):
+        super().__init__()
+        self.board: Board = board
+        self.path: str = path
+
+    def close(self):
+        with self.board.raw_repl() as r:
+            r.fs_writefile(self.path, self.getvalue())
+        super().close()
 
 
 # Paths on the board are always Posix paths even if local host is Windows.
@@ -222,7 +239,22 @@ class MPRemotePath(PosixPath):
         return "root"
 
     def open(self, mode="r", buffering=-1, encoding=None, errors=None, newline=None):
-        raise NotImplementedError
+        """Open the micropython file pointed by this path and return a file
+        object, similar to the built-in open() function.
+        """
+        if buffering != -1:
+            raise io.UnsupportedOperation()
+        action = "".join(c for c in mode if c not in "btU")
+        if action == "r":
+            with self.board.raw_repl() as r:
+                fileobj = io.BytesIO(r.fs_readfile(str(self.resolve())))
+        elif action == "w":
+            fileobj = PathWriter(self.board, str(self.resolve()))
+        else:
+            raise io.UnsupportedOperation()
+        if "b" not in mode:
+            fileobj = io.TextIOWrapper(fileobj, encoding, errors, newline)
+        return fileobj
 
     def read_bytes(self) -> bytes:
         with self.board.raw_repl() as r:
