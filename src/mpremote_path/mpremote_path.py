@@ -20,12 +20,6 @@ from mpremote.transport_serial import SerialTransport
 
 from .board import Board, make_board
 
-# Code which will be run on the micropython board when we connect to it
-START_CODE = """
-def _ils(p):
-  for f in os.ilistdir(p):print(f, end=',')
-"""
-
 
 def mpremotepath(f: str | Path) -> MPRemotePath:
     """If `f` is an `MPRemotePath` instance return it, else convert to
@@ -133,7 +127,7 @@ class MPRemotePath(PosixPath):
         `baud` and `wait` are only used if `port` is a string.
         """
         cls.board = make_board(port, baud, wait, set_clock=set_clock, utc=utc)
-        cls.board.exec(START_CODE)
+        cls.board.exec("import os")
 
     def chdir(self) -> MPRemotePath:
         "Set the current working directory on the board to this path." ""
@@ -173,7 +167,12 @@ class MPRemotePath(PosixPath):
         `glob()`, `rglob()` and `walk()`."""
         dirname = str(self)
         with self.board.raw_repl():  #  Wrap all the file ops in a single raw repl
-            files = self.board.exec_eval(f"_ils('{dirname}')") or tuple()
+            files = (
+                self.board.exec_eval(
+                    f"for f in os.ilistdir('{dirname}'):print(f, end=',')"
+                )
+                or tuple()
+            )
             yield [
                 MPRemoteDirEntry(self.board, dirname, name, *extra)
                 for name, *extra in files
