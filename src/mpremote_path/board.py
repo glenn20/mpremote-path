@@ -6,6 +6,7 @@ mpremote.
 from __future__ import annotations
 
 import ast
+import itertools
 import logging
 import os
 import re
@@ -88,8 +89,10 @@ def logmethod(func, level=logging.DEBUG):
             return func(*args, **kwargs)
         cls, method = args[0], func.__name__
         arg_str = ", ".join(
-            tuple(repr(arg) for arg in args[1:])
-            + tuple(f"{k}={v!r}" for k, v in kwargs.items()),
+            itertools.chain(
+                (repr(arg) for arg in args[1:]),
+                (f"{k}={v!r}" for k, v in kwargs.items()),
+            )
         )
         logger.log(level, f"{cls}.{method}({arg_str})")
         result = func(*args, **kwargs)
