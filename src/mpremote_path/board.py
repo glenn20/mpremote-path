@@ -13,7 +13,16 @@ import re
 import sys
 import time
 from contextlib import contextmanager
-from typing import Any, Callable, Generator
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Generator,
+    Literal,
+    TypeVar,
+    cast,
+    overload,
+)
 
 import mpremote.transport_serial
 from mpremote.transport_serial import SerialTransport, TransportError
@@ -25,7 +34,7 @@ time_offset_tolerance = 1  # seconds
 
 # Override the mpremote stdout writer which fails if stdout does not have a
 # .buffer() method (eg. when running in a jupyter notebook)
-def _mpath_stdout_write_bytes(b: bytes):
+def _mpath_stdout_write_bytes(b: bytes) -> None:
     b = b.replace(b"\x04", b"")
     sys.stdout.write(b.decode())
     sys.stdout.flush()
@@ -82,9 +91,12 @@ def make_board(
     return board
 
 
+T = TypeVar("T", bound=Callable[..., Any])
+
+
 # Decorator to log args and return values of calls to methods of a class
-def logmethod(func, level=logging.DEBUG):
-    def wrap(*args, **kwargs):
+def logmethod(func: T, level: int = logging.DEBUG) -> T:
+    def wrap(*args: Any, **kwargs: Any) -> Any:
         if logger.getEffectiveLevel() < level:
             return func(*args, **kwargs)
         cls, method = args[0], func.__name__
@@ -99,7 +111,7 @@ def logmethod(func, level=logging.DEBUG):
         logger.log(level, f"{cls}.{method}() returned: {result!r}")
         return result
 
-    return wrap
+    return cast(T, wrap)
 
 
 class Board:
@@ -179,36 +191,47 @@ class Board:
                 self._transport.exit_raw_repl()
                 self._transport.read_until(4, b">>> ")
 
-    def soft_reset(self):
+    def soft_reset(self) -> None:
         self._transport.enter_raw_repl(soft_reset=True)
         self._transport.exit_raw_repl()
 
     # Convenience methods to execute stuff in the raw_repl on the micropython board
     @logmethod
-    def exec(self, code: bytes | str, capture: bool = False) -> str:
+    def exec(self, code: str, capture: bool = False) -> str:
         """Execute `code` on the micropython board,
         If `bool(capture)` is True, the output will be returned as a string,
         else it will be printed via Board.writer()."""
         with self.raw_repl(code) as r:
             return r.exec(code, None if capture else self.writer).decode().strip()
 
+    if TYPE_CHECKING:
+
+        @overload
+        def _eval(self, expression: str, parse: Literal[False]) -> str: ...
+        @overload
+        def _eval(self, expression: str, parse: bool = False) -> Any: ...
+
     @logmethod
-    def _eval(self, expression: bytes | str, parse=False) -> Any:
+    def _eval(self, expression: str, parse: bool = False) -> Any:
         """Wrapper around the mpremote `SerialTransport.eval()` method."""
         with self.raw_repl(expression) as r:
-            return r.eval(expression, parse)
+            result = r.eval(expression, parse)
+            if not parse and isinstance(result, bytes):
+                return result.decode()
+            else:
+                return result
 
-    def eval(self, expression: bytes | str) -> Any:
+    def eval(self, expression: str) -> Any:
         """Execute `expression` on the micropython board and evaluate the
         output as a python expression on the local host."""
         return self._eval(expression, parse=True)
 
-    def eval_str(self, expression: bytes | str) -> str:
+    def eval_str(self, expression: str) -> str:
         """Execute `expression` on the micropython board and return the output
         as a python string."""
         return self._eval(expression, parse=False)
 
-    def exec_eval(self, code: bytes | str) -> Any:
+    def exec_eval(self, code: str) -> Any:
         """Execute `code` on the micropython board and (safely) evaluate the
         printed output as a python expression on the local host."""
         response = self.exec(code, capture=True)
