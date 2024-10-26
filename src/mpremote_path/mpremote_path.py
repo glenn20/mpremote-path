@@ -19,10 +19,13 @@ from typing import (
     IO,
     TYPE_CHECKING,
     Any,
+    BinaryIO,
     Generator,
     Iterator,
+    Literal,
     Union,
     cast,
+    overload,
 )
 
 from mpremote.transport_serial import SerialTransport
@@ -31,6 +34,11 @@ from .board import Board, make_board
 
 if TYPE_CHECKING:
     from _typeshed import (
+        OpenBinaryMode,
+        OpenBinaryModeReading,
+        OpenBinaryModeUpdating,
+        OpenBinaryModeWriting,
+        OpenTextMode,
         ReadableBuffer,
         StrOrBytesPath,
     )
@@ -344,6 +352,78 @@ class MPRemotePath(PosixPath):
 
     def group(self) -> str:
         return "root"
+
+    @overload
+    def open(
+        self,
+        mode: OpenTextMode = "r",
+        buffering: int = -1,
+        encoding: str | None = None,
+        errors: str | None = None,
+        newline: str | None = None,
+    ) -> io.TextIOWrapper: ...
+
+    # Unbuffered binary mode: returns a FileIO
+    @overload
+    def open(
+        self,
+        mode: OpenBinaryMode,
+        buffering: Literal[0],
+        encoding: None = None,
+        errors: None = None,
+        newline: None = None,
+    ) -> io.FileIO: ...
+
+    # Buffering is on: return BufferedRandom, BufferedReader, or BufferedWriter
+    @overload
+    def open(
+        self,
+        mode: OpenBinaryModeUpdating,
+        buffering: Literal[-1, 1] = -1,
+        encoding: None = None,
+        errors: None = None,
+        newline: None = None,
+    ) -> io.BufferedRandom: ...
+    @overload
+    def open(
+        self,
+        mode: OpenBinaryModeWriting,
+        buffering: Literal[-1, 1] = -1,
+        encoding: None = None,
+        errors: None = None,
+        newline: None = None,
+    ) -> io.BufferedWriter: ...
+    @overload
+    def open(
+        self,
+        mode: OpenBinaryModeReading,
+        buffering: Literal[-1, 1] = -1,
+        encoding: None = None,
+        errors: None = None,
+        newline: None = None,
+    ) -> io.BufferedReader: ...
+
+    # Buffering cannot be determined: fall back to BinaryIO
+    @overload
+    def open(
+        self,
+        mode: OpenBinaryMode,
+        buffering: int = -1,
+        encoding: None = None,
+        errors: None = None,
+        newline: None = None,
+    ) -> BinaryIO: ...
+
+    # Fallback if mode is not specified
+    @overload
+    def open(
+        self,
+        mode: str,
+        buffering: int = -1,
+        encoding: str | None = None,
+        errors: str | None = None,
+        newline: str | None = None,
+    ) -> IO[Any]: ...
 
     def open(  #  type: ignore
         self,
