@@ -8,6 +8,9 @@ computer. **mpremote-path** provides the `MPRemotePath` class which implements a
 `pathlib.Path` compatible interface to the file access features of the
 [mpremote](https://docs.micropython.org/en/latest/reference/mpremote.html) tool.
 
+Version 0.1.2 passes all tests on windows and linux for python versions 3.8,
+3.9, 3.10, 3.11, 3.12 and 3.13.
+
 **Contents:**
 
 **[`mpremote_path`](#features) module: [Features](#features) | [Installation](#installation) | [API Docs](#api-docs-mpremote_path-module)**
