@@ -139,7 +139,7 @@ if hasattr(Path, "_accessor"):
     # For python<=3.9: Override accessor class to handle micropython paths
     from pathlib import _NormalAccessor  # type: ignore
 
-    class _MPRemoteAccessor(_NormalAccessor):
+    class _MPRemoteAccessor(_NormalAccessor):  # type: ignore
         @staticmethod
         def stat(path: str) -> os.stat_result:
             return MPRemotePath.board.fs_stat(path)

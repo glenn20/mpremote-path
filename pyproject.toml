@@ -65,7 +65,7 @@ files = ["src"]
 python_version = "3.9"
 disallow_untyped_defs = true
 warn_return_any = true
-warn_unused_ignores = true
+warn_unused_ignores = false
 mypy_path = "typings"
 
 [tool.ruff]
@@ -75,7 +75,7 @@ lint.extend-select = ["I"]  # Enable ruffs isort rules (for compat with vscode r
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = ["--cov"]
+addopts = ["--cov", "--color=yes"]
 
 [tool.coverage]
 run.source = ["src"]
