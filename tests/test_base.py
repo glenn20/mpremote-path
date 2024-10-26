@@ -17,7 +17,7 @@ from mpremote_path import MPRemotePath as MPath
 # test fixture is torn down.
 
 
-def test_root_folder(root):
+def test_root_folder(root: MPath):
     """Test the RemotePath class."""
     p = MPath("/")
     assert p.exists() is True
@@ -118,7 +118,7 @@ def test_read_write_text(testfolder: MPath) -> None:
     assert p.exists() is False
 
 
-def test_resolve_samefile(root) -> None:
+def test_resolve_samefile(root: MPath) -> None:
     "Test resolving paths: absolute(), and resolve()"
     q = MPath("./lib/mpy")
     q = q / "../.././main.py"
@@ -176,7 +176,7 @@ def test_open_text(testfolder: MPath) -> None:
     p = MPath("test1.text")
     assert p.exists() is False
     msg = "Hello world\n"
-    f = p.open("w")
+    f = p.open("w", newline="")  # Preserve unix newlines on Windows
     f.write(msg)
     f.close()
     assert (p.exists(), p.is_dir(), p.is_file()) == (True, False, True)

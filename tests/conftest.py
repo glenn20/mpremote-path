@@ -1,3 +1,4 @@
+import argparse
 import logging.config
 import os
 from contextlib import suppress
@@ -17,7 +18,7 @@ data_dir = "tests/_data"  # Local directory containing test data files.
 logging.config.dictConfig(yaml.safe_load(Path("tests/logging.yaml").read_text()))
 
 
-def pytest_addoption(parser):
+def pytest_addoption(parser: argparse.Namespace) -> None:
     parser.addoption(
         "--port",
         dest="port",
@@ -60,7 +61,7 @@ def rm_recursive(path: Path) -> None:
 
 
 @pytest.fixture()
-def root(pytestconfig) -> Generator[MPath, None, None]:
+def root(pytestconfig: argparse.Namespace) -> Generator[MPath, None, None]:
     if not hasattr(MPath, "board"):
         MPath.connect(
             pytestconfig.option.port,
