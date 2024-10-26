@@ -1,4 +1,9 @@
 scratch.py
+/requirements.txt
+.python-version
+_version.py
+/packages/
+/.vscode/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
