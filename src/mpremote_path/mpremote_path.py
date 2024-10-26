@@ -13,7 +13,7 @@ import io
 import os
 import stat
 import sys
-from pathlib import Path, PosixPath, PurePath
+from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
 from shutil import SameFileError
 from typing import (
     IO,
@@ -150,10 +150,12 @@ if hasattr(Path, "_accessor"):
 
         @staticmethod
         def listdir(path: str) -> list[str]:
+            path = PureWindowsPath(path).as_posix() if os.name == "nt" else path
             return [p.name for p in ScanDir(MPRemotePath.board, path)]
 
         @staticmethod
         def scandir(path: str) -> ScanDir:
+            path = PureWindowsPath(path).as_posix() if os.name == "nt" else path
             return ScanDir(MPRemotePath.board, path)
 
     _mpremote_accessor = _MPRemoteAccessor()
@@ -170,6 +172,7 @@ if sys.version_info >= (3, 13):
 
         @staticmethod
         def scandir(path: str) -> ScanDir:
+            path = PureWindowsPath(path).as_posix() if os.name == "nt" else path
             return ScanDir(MPRemotePath.board, path)
 
 
@@ -190,7 +193,7 @@ class PathWriter(io.BytesIO):
 
 
 # Paths on the board are always Posix paths even if local host is Windows.
-class MPRemotePath(PosixPath):
+class MPRemotePath(Path, PurePosixPath):
     "A `pathlib.Path` compatible class to hold details of files on the board."
 
     # __slots__ = ("_stat", "board")
