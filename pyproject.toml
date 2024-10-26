@@ -76,7 +76,7 @@ env.lint.commands = [["ruff", "check"]]
 env.lint.deps = ["ruff"]
 env.format.commands = [["ruff", "format", "--check"]]
 env.format.deps = ["ruff"]
-env_run_base.commands = [["pytest"]]
+env_run_base.commands = [["pytest", {replace = "posargs", extend = true}]]
 env_run_base.deps = ["pytest", "pytest-cov", "requests", "pyyaml"]
 env_run_base.package = "editable"
 env_run_base.runner = "uv-venv-runner"
