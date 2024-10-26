@@ -9,20 +9,21 @@ directories on micropython boards and for printing listings of files and
 directories.
 """
 
+from __future__ import annotations
+
 import shutil
 import time
 from pathlib import Path
-from typing import Callable, Iterable
+from typing import Any, Callable, Iterable, Tuple, Union
 
 from mpremote_path import MPRemotePath as MPath
 from mpremote_path import is_wildcard_pattern, mpremotepath
-from mpremote_path.mpremote_path import MPRemotePath
 from mpremote_path.util import mpfsops
 
 # A list of files and/or directories: [file1, file2, ...]
-FileList = Iterable[Path | str] | Path | str
+FileList = Union[Iterable[Union[Path, str]], Path, str]
 # A directory and its contents: (directory, [file1, file2, ...])
-Dirfiles = tuple[Path | None, Iterable[Path]]
+Dirfiles = Tuple[Union[Path, None], Iterable[Path]]
 Dirlist = Iterable[Dirfiles]  # A list of directories and their contents
 
 
@@ -41,17 +42,19 @@ name_formatter: Callable[[Path], str] = default_name_formatter
 path_formatter: Callable[[Path], str] = default_path_formatter
 
 
-def local_path(path: Path | str, cls=Path) -> Path:
+def local_path(path: Path | str, cls: type[Path] = Path) -> Path:
     """If `path` is a string, return a `Path` instance (`MPath` if it starts
     with `:`)."""
     return (
         path
         if isinstance(path, Path)
-        else MPath(path[1:]) if path.startswith(":") else cls(path)
+        else MPath(path[1:])
+        if path.startswith(":")
+        else cls(path)
     )
 
 
-def path_list(files: FileList, cls=Path) -> Iterable[Path]:
+def path_list(files: FileList, cls: type[Path] = Path) -> Iterable[Path]:
     """A convenience function for creating a list of `Path` instances.
     - `files` contains the files/directories to print, which may be:
         - `Iterable[Path|MPath|str]`: a list of files/directories,
@@ -61,8 +64,7 @@ def path_list(files: FileList, cls=Path) -> Iterable[Path]:
 
     `str` values in the list will be converted to instances of `cls` and may
     include filename globbing wildcard characters: `*`, `?`, `[xyz]`, `[!xyz]`
-    or
-    `**`."""
+    or `**`."""
     filelist: Iterable[Path | str] = (
         (files,) if isinstance(files, str) or isinstance(files, Path) else files
     )
@@ -70,7 +72,7 @@ def path_list(files: FileList, cls=Path) -> Iterable[Path]:
     for f in filelist:
         if isinstance(f, str) and is_wildcard_pattern(f):
             # Expand glob pattern and yield each file
-            yield from list(cwd.glob(f)) or [cls(f)]
+            yield from (list(cwd.glob(f)) or [cls(f)])
         else:
             # Yield the next file - convert to cls if necessary
             yield f if isinstance(f, cls) else cls(f)
@@ -140,7 +142,7 @@ def ls_short(dirlist: Dirlist) -> None:
 
 
 def ls(
-    files: FileList,
+    files: FileList = ".",
     long_style: bool = False,
     recursive: bool = False,
 ) -> None:
@@ -167,7 +169,7 @@ def get(files: FileList, dest: Path | str) -> Path:
     return p
 
 
-def put(files: FileList, dest: Path | str) -> MPRemotePath:
+def put(files: FileList, dest: Path | str) -> MPath:
     """Get files and directories from the micropython board.
     `dest` must be an existing directory."""
     p = mpremotepath(dest)
@@ -175,7 +177,7 @@ def put(files: FileList, dest: Path | str) -> MPRemotePath:
     return p
 
 
-def cp(files: FileList, dest: Path | str) -> MPRemotePath:
+def cp(files: FileList, dest: Path | str) -> MPath:
     """Copy files and directories from `files` to `dest` on the micropython board.
     If `dest` is an existing directory, move all files into it.
     If `dest` is not an existing directory and there is only one source `file`
@@ -186,7 +188,7 @@ def cp(files: FileList, dest: Path | str) -> MPRemotePath:
     return p
 
 
-def mv(files: FileList, dest: Path | str) -> MPRemotePath:
+def mv(files: FileList, dest: Path | str) -> MPath:
     """Implement the `mv` command to move/rename files and directories.
     If `dest` is an existing directory, move all files/dirs into it.
     If `dest` is not an existing directory and there is only one source `path`
@@ -246,7 +248,7 @@ def cwd() -> MPath:
     return MPath.cwd()
 
 
-def connect(*args, **kwargs) -> None:
+def connect(*args: Any, **kwargs: Any) -> None:
     """Connect to a micropython board.
     The arguments are passed to `MPath.connect()`."""
     MPath.connect(*args, **kwargs)

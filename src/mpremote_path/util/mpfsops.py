@@ -8,20 +8,22 @@ the `mpfscmd` sub-module to operate on files specified as strings or lists of
 strings.
 """
 
+from __future__ import annotations
+
 import shutil
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable, Optional, Tuple
 
 from mpremote_path import MPRemotePath as MPath
 
 # A directory and its contents: (directory, [file1, file2, ...])
-Dirfiles = tuple[Path | None, Iterable[Path]]
+Dirfiles = Tuple[Optional[Path], Iterable[Path]]
 Dirlist = Iterable[Dirfiles]  # A list of directories and their contents
 
 max_depth = 20  # Default maximum depth for recursive directory listings
 
 
-def connect(*args, **kwargs) -> None:
+def connect(*args: Any, **kwargs: Any) -> None:
     """Connect to a micropython board.
     The arguments are passed to `MPath.connect()`."""
     MPath.connect(*args, **kwargs)
@@ -33,14 +35,7 @@ def copyfile(src: Path, dst: Path) -> Path:
     if not src.is_file():
         raise ValueError(f"'{src}' is not a regular file")
     elif isinstance(src, MPath) and isinstance(dst, MPath):
-        with src.board.raw_repl() as r:
-            r.fs_cp(str(src), str(dst))  # Both files are on the micropython board
-    elif isinstance(src, MPath) and not isinstance(dst, MPath):
-        with src.board.raw_repl() as r:
-            r.fs_get(str(src), str(dst))  # Copy from micropython board to local
-    elif not isinstance(src, MPath) and isinstance(dst, MPath):
-        with dst.board.raw_repl() as r:
-            r.fs_put(str(src), str(dst))  # Copy from local to micropython board
+        src.copyfile(dst)  # Copy from micropython board to micropython board
     elif not isinstance(src, MPath) and not isinstance(dst, MPath):
         shutil.copyfile(src, dst)  # Copy local file to local file
     else:
@@ -82,7 +77,7 @@ def copy(files: Iterable[Path], dest: Path) -> None:
     if dest.is_dir():
         for f in it:
             rcopy(f, dest / f.name)
-    elif (f := next(it, None)) and next(it, None) is None:
+    elif (f := next(it, None)) and next(it, None) is None:  # type: ignore
         # If there is only one src `path`, make a copy called `dest`
         rcopy(f, dest)
     else:
@@ -103,7 +98,7 @@ def move(files: Iterable[Path], dest: Path) -> None:
             slash = "/" if src.is_dir() else ""
             print(f"{src}{slash} -> {dst}{slash}")
             src.rename(dst)
-    elif (src := next(it, None)) is not None and next(it, None) is None:
+    elif (src := next(it, None)) is not None and next(it, None) is None:  # type: ignore
         # If there is only one src `path`, rename it to `dest`
         slash = "/" if src.is_dir() else ""
         print(f"{src}{slash} -> {dest}{slash}")
