@@ -2,6 +2,7 @@ import itertools
 from pathlib import Path
 from typing import Iterable
 
+
 def ls_dir(path: Path) -> Iterable[Path]:
     """List all the files and dirs recursively."""
     if path.is_dir():
@@ -22,5 +23,3 @@ def check_folders(src: Path, dest: Path) -> None:
     for s, d in zip(local, remote):
         print(s.as_posix())
         assert s.read_bytes() == d.read_bytes()
-
-

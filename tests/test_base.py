@@ -2,6 +2,7 @@ import stat
 from shutil import SameFileError
 
 import pytest
+
 from mpremote_path import MPRemotePath as MPath
 
 # The `root` fixture saves the current working directory, cd's to the root
@@ -121,15 +122,9 @@ def test_resolve_samefile(root) -> None:
     "Test resolving paths: absolute(), and resolve()"
     q = MPath("./lib/mpy")
     q = q / "../.././main.py"
-    assert (
-        q.as_posix(),
-        q.absolute().as_posix(),
-        q.absolute().resolve().as_posix(),
-    ) == (
-        "lib/mpy/../../main.py",
-        "/lib/mpy/../../main.py",
-        "/main.py",
-    )
+    assert q.as_posix() == "lib/mpy/../../main.py"
+    assert q.absolute().as_posix() == "/lib/mpy/../../main.py"
+    assert q.absolute().resolve().as_posix() == "/main.py"
     assert q.samefile(q.absolute()) is True
     assert q.samefile(q.absolute().resolve()) is True
 

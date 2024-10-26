@@ -63,8 +63,8 @@ def test_glob_rglob(testfolder: MPath, localdata: Path) -> None:
     src, dest = Path("./lib"), MPath("./lib")
     assert (src.exists(), dest.exists()) == (True, False)
     copy_recursive(src, dest)
-    assert sorted([f.as_posix() for f in (src / "lib/ota").glob("*.py")]) == sorted(
-        [f.as_posix() for f in (dest / "lib/ota").glob("*.py")]
+    assert sorted([f.as_posix() for f in (src / "ota").glob("*.py")]) == sorted(
+        [f.as_posix() for f in (dest / "ota").glob("*.py")]
     )
     assert sorted([f.as_posix() for f in src.rglob("*.py")]) == sorted(
         [f.as_posix() for f in dest.rglob("*.py")]
