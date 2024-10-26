@@ -60,27 +60,6 @@ dev-dependencies = [
   "hatch-vcs>=0.3.0",  # For building and updating _version.py
 ]
 
-# https://tox.wiki/en/latest/config.html#pyproject-toml-native
-[tool.tox]  #
-env_list = [
-    "clean", "mypy", "lint", "format",
-    "3.9", "3.10", "3.11", "3.12", "3.13"
-]
-requires = ["tox>=4.19", "tox-uv>=1.13"]
-env.clean.commands = [["coverage", "erase"]]  # Cleanup coverage data
-env.clean.deps = ["coverage"]
-env.clean.skip_install = true
-env.mypy.commands = [["mypy"]]
-env.mypy.deps = ["mypy", "pytest", "types-requests", "types-pyserial"]
-env.lint.commands = [["ruff", "check"]]
-env.lint.deps = ["ruff"]
-env.format.commands = [["ruff", "format", "--check"]]
-env.format.deps = ["ruff"]
-env_run_base.commands = [["pytest", {replace = "posargs", extend = true}]]
-env_run_base.deps = ["pytest", "pytest-cov", "requests", "pyyaml"]
-env_run_base.package = "editable"
-env_run_base.runner = "uv-venv-runner"
-
 [tool.mypy]
 files = ["src"]
 python_version = "3.9"
@@ -103,3 +82,24 @@ run.source = ["src"]
 run.omit = ["_version.py"]
 report.skip_covered = false
 append = true
+
+# https://tox.wiki/en/latest/config.html#pyproject-toml-native
+[tool.tox]  #
+env_list = [
+    "clean", "mypy", "lint", "format",
+    "3.9", "3.10", "3.11", "3.12", "3.13"
+]
+requires = ["tox>=4.19", "tox-uv>=1.13"]
+env.clean.commands = [["coverage", "erase"]]  # Cleanup coverage data
+env.clean.deps = ["coverage"]
+env.clean.skip_install = true
+env.mypy.commands = [["mypy"]]
+env.mypy.deps = ["mypy", "pytest", "types-requests", "types-pyserial"]
+env.lint.commands = [["ruff", "check"]]
+env.lint.deps = ["ruff"]
+env.format.commands = [["ruff", "format", "--check"]]
+env.format.deps = ["ruff"]
+env_run_base.commands = [["pytest", {replace = "posargs", extend = true}]]
+env_run_base.deps = ["pytest", "pytest-cov", "requests", "pyyaml"]
+env_run_base.package = "editable"
+env_run_base.runner = "uv-venv-runner"
