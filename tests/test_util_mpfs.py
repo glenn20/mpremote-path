@@ -78,14 +78,14 @@ def test_cp_file(testfolder: MPath) -> None:
 
 def test_put_file(testfolder: MPath, localdata: Path) -> None:
     "Test copy file to board"
-    src, dst = "./lib/ota/status.py", "./status2.py"
+    src, dst = "./src/ota/status.py", "./status2.py"
     fscmd.put(src, dst)
     assert MPath(dst).read_text() == Path(src).read_text()
 
 
 def test_put_dir(testfolder: MPath, localdata: Path) -> None:
     "Test copy directory and contents to board."
-    src, dst = "lib", "."
+    src, dst = "src", "."
     fscmd.put(src, dst)
     p = Path(src)
     check_folders(p, MPath(dst) / p.name)
@@ -93,10 +93,10 @@ def test_put_dir(testfolder: MPath, localdata: Path) -> None:
 
 def test_put_glob(testfolder: MPath, localdata: Path) -> None:
     "Test copy file by globbing to board"
-    src, dst = "./lib/ota/*.py", "."
+    src, dst = "./src/ota/*.py", "."
     fscmd.put(src, dst)
     q = MPath(dst)
-    for p in Path("./lib/ota").glob("*.py"):
+    for p in Path("./src/ota").glob("*.py"):
         assert p.read_text() == (q / p.name).read_text()
 
 
@@ -111,7 +111,7 @@ def test_get_file(testfolder: MPath, localdata: Path) -> None:
 
 def test_get_dir(testfolder: MPath, localdata: Path) -> None:
     "Test copy directory and contents from board"
-    src, dst, dst2 = "lib", ".", "test2"
+    src, dst, dst2 = "src", ".", "test2"
     fscmd.put(src, dst)
     q = Path(dst2)
     q.mkdir()
@@ -121,10 +121,10 @@ def test_get_dir(testfolder: MPath, localdata: Path) -> None:
 
 def test_get_glob(testfolder: MPath, localdata: Path) -> None:
     "Test copy file globs from board"
-    src, dst, dst2 = "lib", ".", "test2"
+    src, dst, dst2 = "src", ".", "test2"
     fscmd.put(src, dst)
     q = Path(dst2)
     q.mkdir()
-    fscmd.get("lib/ota/*.py", dst2)
-    for p in Path("./lib/ota").glob("*.py"):
+    fscmd.get("src/ota/*.py", dst2)
+    for p in Path("./src/ota").glob("*.py"):
         assert p.read_text() == (q / p.name).read_text()

@@ -46,7 +46,7 @@ def rm_recursive(path: Path) -> None:
 
 def test_recursive_copy(testfolder: MPath, localdata: Path) -> None:
     "Test recursively copying local files to the micropython board."
-    src, dest = Path("./lib"), MPath("./lib")
+    src, dest = Path("./src"), MPath("./src")
     assert (src.exists(), dest.exists()) == (True, False)
     copy_recursive(src, dest)
     local = sorted([f for f in ls_dir(src) if f.is_file()])
@@ -60,7 +60,7 @@ def test_recursive_copy(testfolder: MPath, localdata: Path) -> None:
 
 def test_glob_rglob(testfolder: MPath, localdata: Path) -> None:
     "Test glob methods."
-    src, dest = Path("./lib"), MPath("./lib")
+    src, dest = Path("./src"), MPath("./src")
     assert (src.exists(), dest.exists()) == (True, False)
     copy_recursive(src, dest)
     assert sorted([f.as_posix() for f in (src / "ota").glob("*.py")]) == sorted(
@@ -73,6 +73,6 @@ def test_glob_rglob(testfolder: MPath, localdata: Path) -> None:
 
 def test_recursive_rm(testfolder: MPath, localdata: Path) -> None:
     "Test recursively deleting files and directories."
-    _src, dest = Path("./lib"), MPath("./lib")
+    _src, dest = Path("./src"), MPath("./src")
     rm_recursive(dest)
     assert dest.exists() is False

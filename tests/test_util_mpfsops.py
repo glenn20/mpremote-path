@@ -27,7 +27,7 @@ def copyfile_check(src: Path, dest: Path) -> None:
 
 def test_copyfile(testfolder: MPath, localdata: Path) -> None:
     "Test copying files to and from the board."
-    src, dest = Path("./lib/ota/status.py"), MPath("status.py")
+    src, dest = Path("./src/ota/status.py"), MPath("status.py")
     copyfile_check(src, dest)  # Copy local to the board
     dest2 = MPath("status2.py")
     copyfile_check(dest, dest2)  # Make a second copy on the board
@@ -41,7 +41,7 @@ def test_copyfile(testfolder: MPath, localdata: Path) -> None:
 
 def test_copypath(testfolder: MPath, localdata: Path) -> None:
     "Test recursively copying a local file/dir to the micropython board."
-    src, dest = Path("./lib"), MPath("./lib")
+    src, dest = Path("./src"), MPath("./src")
     assert (src.exists(), dest.exists()) == (True, False)
     mpfsops.copypath(src, dest)
     assert (dest.exists(), dest.is_dir(), dest.is_file()) == (True, True, False)
@@ -49,7 +49,7 @@ def test_copypath(testfolder: MPath, localdata: Path) -> None:
 
 def test_rcopy(testfolder: MPath, localdata: Path) -> None:
     "Test recursively copying local files/dirs to the micropython board."
-    src, dest = Path("./lib"), MPath("./lib2")
+    src, dest = Path("./src"), MPath("./src2")
     assert (src.exists(), dest.exists()) == (True, False)
     mpfsops.rcopy(src, dest)
     assert (dest.exists(), dest.is_dir(), dest.is_file()) == (True, True, False)
@@ -57,7 +57,7 @@ def test_rcopy(testfolder: MPath, localdata: Path) -> None:
 
 def test_copy_file(testfolder: MPath, localdata: Path) -> None:
     "Test copying a local file to the micropython board."
-    src, dest = Path("./lib/ota/status.py"), MPath("status.py")
+    src, dest = Path("./src/ota/status.py"), MPath("status.py")
     assert (src.exists(), dest.exists()) == (True, False)
     mpfsops.copy([src], dest)
     assert (dest.exists(), dest.is_dir(), dest.is_file()) == (True, False, True)
@@ -65,7 +65,7 @@ def test_copy_file(testfolder: MPath, localdata: Path) -> None:
 
 def test_copy_folder(testfolder: MPath, localdata: Path) -> None:
     "Test recursively copying local files to the micropython board."
-    src, dest = Path("./lib"), MPath(".")
+    src, dest = Path("./src"), MPath(".")
     assert (src.exists(), dest.exists()) == (True, True)
     mpfsops.copy([src], dest)
     check_folders(src, dest / src.name)
@@ -73,7 +73,7 @@ def test_copy_folder(testfolder: MPath, localdata: Path) -> None:
 
 def test_remove_file(testfolder: MPath, localdata: Path) -> None:
     "Test deleting files on board."
-    src, dest = Path("./lib/ota/status.py"), MPath("status.py")
+    src, dest = Path("./src/ota/status.py"), MPath("status.py")
     assert (src.exists(), dest.exists()) == (True, False)
     mpfsops.copy([src], dest)
     assert (dest.exists(), dest.is_dir(), dest.is_file()) == (True, False, True)
@@ -83,7 +83,7 @@ def test_remove_file(testfolder: MPath, localdata: Path) -> None:
 
 def test_remove_folder(testfolder: MPath, localdata: Path) -> None:
     "Test deleting folders on board."
-    src, dest = Path("./lib"), MPath("./lib2")
+    src, dest = Path("./src"), MPath("./src2")
     assert (src.exists(), dest.exists()) == (True, False)
     mpfsops.rcopy(src, dest)
     assert (dest.exists(), dest.is_dir(), dest.is_file()) == (True, True, False)
@@ -93,7 +93,7 @@ def test_remove_folder(testfolder: MPath, localdata: Path) -> None:
 
 def test_move_file(testfolder: MPath, localdata: Path) -> None:
     "Test renaming files on the board."
-    src, dest = Path("./lib/ota/status.py"), MPath("status.py")
+    src, dest = Path("./src/ota/status.py"), MPath("status.py")
     assert (src.exists(), dest.exists()) == (True, False)
     mpfsops.copy([src], dest)
     assert (dest.exists(), dest.is_dir(), dest.is_file()) == (True, False, True)
@@ -105,11 +105,11 @@ def test_move_file(testfolder: MPath, localdata: Path) -> None:
 
 def test_move_folder(testfolder: MPath, localdata: Path) -> None:
     "Test renaming folders on the board."
-    src, dest = Path("./lib"), MPath("lib")
+    src, dest = Path("./src"), MPath("src")
     assert (src.exists(), dest.exists()) == (True, False)
     mpfsops.rcopy(src, dest)
     assert (dest.exists(), dest.is_dir(), dest.is_file()) == (True, True, False)
-    dest2 = MPath("lib2")
+    dest2 = MPath("src2")
     mpfsops.move([dest], dest2)
     assert (dest.exists(), dest.is_dir(), dest.is_file()) == (False, False, False)
     assert (dest2.exists(), dest2.is_dir(), dest2.is_file()) == (True, True, False)
