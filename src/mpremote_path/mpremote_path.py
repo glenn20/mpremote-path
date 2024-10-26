@@ -12,17 +12,36 @@ from __future__ import annotations
 import io
 import os
 import stat
-from contextlib import contextmanager
-from pathlib import Path, PosixPath
+import sys
+from pathlib import Path, PosixPath, PurePath
 from shutil import SameFileError
-from typing import Generator, Iterable
+from typing import (
+    IO,
+    TYPE_CHECKING,
+    Any,
+    Generator,
+    Iterator,
+    Union,
+    cast,
+)
 
 from mpremote.transport_serial import SerialTransport
 
 from .board import Board, make_board
 
+if TYPE_CHECKING:
+    from _typeshed import (
+        ReadableBuffer,
+        StrOrBytesPath,
+    )
 
-def mpremotepath(f: str | Path) -> MPRemotePath:
+if sys.version_info >= (3, 10):
+    PathType = os.PathLike[str]
+else:
+    PathType = PurePath
+
+
+def mpremotepath(f: str | PathType) -> MPRemotePath:
     """If `f` is an `MPRemotePath` instance return it, else convert to
     `MPRemotePath` and return it."""
     return f if isinstance(f, MPRemotePath) else MPRemotePath(f)
@@ -85,6 +104,67 @@ class MPRemoteDirEntry:
         return self._stat
 
 
+# Path.glob(), Path.rglob(), Path.walk() and Path.iterdir() rely on _scandir()
+# Can't use @contextmanager decorator because it doesn't work with broken
+# pathlib.rglob()/walk() on python 3.12.
+class ScanDir:
+    def __init__(self, board: Board, path: str):
+        #  Wrap all the file ops in a single raw repl
+        with board.raw_repl():
+            files: tuple[tuple[str]] = (
+                board.exec_eval(f"for f in os.ilistdir('{path}'):print(f, end=',')")
+                or tuple()
+            )
+            self.result = (MPRemoteDirEntry(board, path, *f) for f in files)
+
+    def __enter__(self) -> ScanDir:
+        return self
+
+    def __exit__(self, *_exc: Any) -> None:
+        pass
+
+    def __iter__(self) -> Iterator[MPRemoteDirEntry]:
+        return self.result
+
+
+if hasattr(Path, "_accessor"):
+    # For python<=3.9: Override accessor class to handle micropython paths
+    from pathlib import _NormalAccessor  # type: ignore
+
+    class _MPRemoteAccessor(_NormalAccessor):
+        @staticmethod
+        def stat(path: str) -> os.stat_result:
+            return MPRemotePath.board.fs_stat(path)
+
+        @staticmethod
+        def lstat(path: str) -> os.stat_result:
+            return MPRemotePath.board.fs_stat(path)
+
+        @staticmethod
+        def listdir(path: str) -> list[str]:
+            return [p.name for p in ScanDir(MPRemotePath.board, path)]
+
+        @staticmethod
+        def scandir(path: str) -> ScanDir:
+            return ScanDir(MPRemotePath.board, path)
+
+    _mpremote_accessor = _MPRemoteAccessor()
+
+
+if sys.version_info >= (3, 13):
+    # For python>=3.13: Override globber class to handle micropython paths
+    from glob import _StringGlobber  #  type: ignore
+
+    class _MPRemoteGlobber(_StringGlobber):  #  type: ignore
+        @staticmethod
+        def lstat(path: str) -> os.stat_result:
+            return MPRemotePath.board.fs_stat(path)
+
+        @staticmethod
+        def scandir(path: str) -> ScanDir:
+            return ScanDir(MPRemotePath.board, path)
+
+
 class PathWriter(io.BytesIO):
     """File object that flushes its contents to a micropython file on close.
     Returned by MPRemotePath.open(mode="w").
@@ -95,7 +175,7 @@ class PathWriter(io.BytesIO):
         self.board: Board = board
         self.path: str = path
 
-    def close(self):
+    def close(self) -> None:
         with self.board.raw_repl() as r:
             r.fs_writefile(self.path, self.getvalue())
         super().close()
@@ -104,6 +184,7 @@ class PathWriter(io.BytesIO):
 # Paths on the board are always Posix paths even if local host is Windows.
 class MPRemotePath(PosixPath):
     "A `pathlib.Path` compatible class to hold details of files on the board."
+
     # __slots__ = ("_stat", "board")
     board: Board
     _stat: os.stat_result | None
@@ -111,13 +192,32 @@ class MPRemotePath(PosixPath):
     _root: str
     _parts: list[str]
 
-    def __new__(cls, *args) -> MPRemotePath:
-        if not cls.board:
+    if sys.version_info >= (3, 13):
+        _globber = _MPRemoteGlobber
+
+    def __init__(self, *args: str | PathType) -> None:
+        if not self.__class__.board:
             raise ValueError("Must call MPRemotePath.connect() before use.")
-        self = cls._from_parts(args)  # type: ignore
         self.board = self.__class__.board
         self._stat = None
+        if hasattr(self, "_from_parts"):
+            super().__init__()
+        else:
+            super().__init__(*args)
+        if hasattr(Path, "_accessor"):
+            self._accessor = _mpremote_accessor  # For python<=3.9
+
+    def __new__(cls, *args: str | PathType) -> MPRemotePath:
+        if not cls.board:
+            raise ValueError("Must call MPRemotePath.connect() before use.")
+        if hasattr(cls, "_from_parts"):
+            self = cast(MPRemotePath, getattr(cls, "_from_parts")(args))
+        else:
+            self = super().__new__(cls, *args)
         return self
+
+    def with_segments(self, *pathsegments: str | PathType) -> MPRemotePath:
+        return MPRemotePath(*pathsegments)
 
     # Additional convenience methods for MPRemotePath
     @classmethod
@@ -156,8 +256,17 @@ class MPRemotePath(PosixPath):
         target = mpremotepath(target)
         if self.samefile(target):
             raise SameFileError(f"{self!s} and {target!s} are the same file")
-        with self.board.raw_repl() as r:
-            r.fs_cp(str(self), str(target))
+        target.write_bytes(self.read_bytes())
+        # with self.board.raw_repl() as r:
+        #     r.fs_writefile(str(target), r.fs_readfile(str(self)))
+        # r.exec(
+        #     "def _f(a,b):\n"
+        #     " b=memoryview(bytearray(512))\n"
+        #     " with open(a,'rb') as s, open(b,'wb') as t:\n"
+        #     "  while n:=s.readinto(b):\n"
+        #     "   t.write(b[:n])\n"
+        #     f"_f({str(self)!r},{str(target)!r})"
+        # )
         return target
 
     def copy(self, target: MPRemotePath | str) -> MPRemotePath:
@@ -177,60 +286,58 @@ class MPRemotePath(PosixPath):
         return cls("/")
 
     # Path.glob(), Path.rglob(), Path.walk() and Path.iterdir() rely on _scandir()
-    @contextmanager
-    def _scandir(self) -> Generator[Iterable[MPRemoteDirEntry], None, None]:
+    def _scandir(self) -> ScanDir:
         """Override for Path._scandir(): returns a context manager which produces an
         iterable of information about the files in a folder. This is used by
         `glob()`, `rglob()` and `walk()`."""
-        dirname = str(self)
-        with self.board.raw_repl():  #  Wrap all the file ops in a single raw repl
-            files = (
-                self.board.exec_eval(
-                    f"for f in os.ilistdir('{dirname}'):print(f, end=',')"
-                )
-                or tuple()
-            )
-            yield [
-                MPRemoteDirEntry(self.board, dirname, name, *extra)
-                for name, *extra in files
-            ]
+        return ScanDir(self.board, str(self))
 
     def _from_direntry(self, entry: MPRemoteDirEntry) -> MPRemotePath:
         """Create a new `MPRemotePath` instance from a `MPRemoteDirEntry`
         object. The file `stat()` information from the `direntry` is cached in
         the new instance."""
-        p: MPRemotePath = self._make_child_relpath(entry.name)  # type: ignore
+        p = MPRemotePath(str(self), entry.name)
         p.board = self.board
         p._stat = entry.stat()
         return p
 
-    def iterdir(self) -> Iterable[MPRemotePath]:
+    def iterdir(self) -> Generator[MPRemotePath, None, None]:
         with self._scandir() as it:
             return (self._from_direntry(f) for f in it)
+
+    def absolute(self) -> MPRemotePath:
+        return self if self.is_absolute() else self.cwd() / self
 
     def resolve(self, strict: bool = False) -> MPRemotePath:
         # The fs on the board has no concept of symlinks, so just eliminate ".."
         # and "." from the absolute path.
-        parts = self._parts if self.is_absolute() else (self.cwd()._parts + self._parts)
-        new_parts = []
+        is_abs = self.is_absolute()
+        parts = self.parts if is_abs else (self.cwd().parts + self.parts)
+        new_parts: list[str] = []
         for p in parts:
             if p == ".." and new_parts:
                 new_parts.pop()
             elif p != ".":
                 new_parts.append(p)
-        p = self._from_parts(new_parts)  # type: ignore
-        return p if p._parts != self._parts else self
+        return (
+            self if is_abs and new_parts == list(parts) else
+            self.with_segments(*new_parts)
+        )  # fmt: skip
 
-    def samefile(self, other: Path | str) -> bool:
-        if isinstance(other, str):
-            other = MPRemotePath(other)
-        return isinstance(other, MPRemotePath) and self.resolve() == other.resolve()
+    def samefile(self, other_path: Union[str, os.PathLike[str]]) -> bool:
+        if isinstance(other_path, str):
+            other_path = MPRemotePath(other_path)
+        return (
+            isinstance(other_path, MPRemotePath)
+            and self.resolve() == other_path.resolve()
+        )
 
-    def stat(self) -> os.stat_result:
+    def stat(self, *, follow_symlinks: bool = False) -> os.stat_result:
         if hasattr(self, "_stat") and self._stat is not None:
             return self._stat
-        self._stat = self.board.fs_stat(str(self))
-        return self._stat
+        stat = self.board.fs_stat(str(self))
+        self._stat = stat
+        return stat
 
     def owner(self) -> str:
         return "root"
@@ -238,7 +345,14 @@ class MPRemotePath(PosixPath):
     def group(self) -> str:
         return "root"
 
-    def open(self, mode="r", buffering=-1, encoding=None, errors=None, newline=None):
+    def open(  #  type: ignore
+        self,
+        mode: str = "r",
+        buffering: int = -1,
+        encoding: str | None = None,
+        errors: str | None = None,
+        newline: str | None = None,
+    ) -> IO[Any]:
         """Open the micropython file pointed by this path and return a file
         object, similar to the built-in open() function.
         """
@@ -253,47 +367,63 @@ class MPRemotePath(PosixPath):
         else:
             raise io.UnsupportedOperation()
         if "b" not in mode:
-            fileobj = io.TextIOWrapper(fileobj, encoding, errors, newline)
+            return io.TextIOWrapper(fileobj, encoding, errors, newline)
         return fileobj
 
     def read_bytes(self) -> bytes:
         with self.board.raw_repl() as r:
             return r.fs_readfile(str(self))
 
-    def read_text(self, encoding=None, errors=None) -> str:
+    def read_text(self, encoding: str | None = None, errors: str | None = None) -> str:
         return self.read_bytes().decode(encoding or "utf-8", errors or "strict")
 
-    def write_bytes(self, data: bytes) -> None:
+    def write_bytes(self, data: ReadableBuffer) -> int:
         self._stat = None
+        buf = bytes(data)
         with self.board.raw_repl() as r:
-            r.fs_writefile(str(self), data)
+            r.fs_writefile(str(self), buf)
+        return len(buf)
 
-    def write_text(self, data, encoding=None, errors=None, newline=None):
+    def write_text(
+        self,
+        data: str,
+        encoding: str | None = None,
+        errors: str | None = None,
+        newline: str | None = None,
+    ) -> int:
         return self.write_bytes(data.encode(encoding or "utf-8", errors or "strict"))
 
-    def readlink(self):
+    def readlink(self) -> MPRemotePath:
         raise NotImplementedError
 
-    def touch(self, mode=0o666, exist_ok=True) -> None:
+    def touch(self, mode: int = 0o666, exist_ok: bool = True) -> None:
         self._stat = None
         with self.board.raw_repl() as r:
-            r.fs_touch(str(self))
+            if hasattr(r, "fs_touchfile"):
+                r.fs_touchfile(str(self))  # mpremote >= 1.24.0
+            else:
+                r.fs_touch(str(self))
 
-    def mkdir(self, mode=0o777, parents=False, exist_ok=False) -> None:
+    def mkdir(
+        self, mode: int = 0o777, parents: bool = False, exist_ok: bool = False
+    ) -> None:
         self._stat = None
         with self.board.raw_repl() as r:
             r.fs_mkdir(str(self))
 
-    def chmod(self, mode: int, *, follow_symlinks=True) -> None:
+    def chmod(self, mode: int, *, follow_symlinks: bool = True) -> None:
         raise NotImplementedError
 
     def lchmod(self, mode: int) -> None:
         raise NotImplementedError
 
-    def unlink(self, missing_ok=False) -> None:
+    def unlink(self, missing_ok: bool = False) -> None:
         self._stat = None
         with self.board.raw_repl() as r:
-            r.fs_rm(str(self))
+            if hasattr(r, "fs_rmfile"):
+                r.fs_rmfile(str(self))  # mpremote >= 1.24.0
+            else:
+                r.fs_rm(str(self))
 
     def rmdir(self) -> None:
         self._stat = None
@@ -303,28 +433,28 @@ class MPRemotePath(PosixPath):
     def lstat(self) -> os.stat_result:
         return self.stat()
 
-    def rename(self, target: Path | str) -> MPRemotePath:
+    def rename(self, target: str | PathType) -> MPRemotePath:
         self.board.exec(f"os.rename('{self}','{target}')")
         target = mpremotepath(target)
         target._stat = self._stat
         self._stat = None
         return target
 
-    def replace(self, target: Path | str) -> MPRemotePath:
+    def replace(self, target: str | PathType) -> MPRemotePath:
         return self.rename(target)
 
-    def symlink_to(
+    def symlink_to(  # type: ignore
         self, target: MPRemotePath | str, target_is_directory: bool = False
     ) -> None:
         raise NotImplementedError
 
-    def hardlink_to(self, target: MPRemotePath | str) -> None:
+    def hardlink_to(self, target: StrOrBytesPath) -> None:
         raise NotImplementedError
 
-    def link_to(self, target: MPRemotePath | str) -> None:
+    def link_to(self, target: MPRemotePath | str) -> None:  # type: ignore
         raise NotImplementedError
 
-    def exists(self) -> bool:
+    def exists(self, *, follow_symlinks: bool = False) -> bool:
         try:
             self.stat()
         except FileNotFoundError:
@@ -356,8 +486,5 @@ class MPRemotePath(PosixPath):
         return False
 
     def expanduser(self) -> MPRemotePath:
-        return (  # Interpret a leading "~/" as the root directory
-            self._from_parts(["/"] + self._parts[1:])  # type: ignore
-            if (not (self._drv or self._root) and self._parts[:1] == ["~"])
-            else self
-        )
+        first, rest = self.parts[:1], self.parts[1:]
+        return self.with_segments("/", *rest) if first == ("~",) else self
