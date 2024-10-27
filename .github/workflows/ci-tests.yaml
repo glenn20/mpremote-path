@@ -1,0 +1,37 @@
+name: Test and Build
+
+# Run the code checks and CI pytest workflow on
+# - push to `main` or `dev` branches, or
+# - manually triggered from github Actions tab.
+
+# Build and publish to test.pypi on
+# - push to `main` branch.
+
+on:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+
+jobs:
+  # Can't run pytest tests as they require hardware-in-the-loop
+  # So, just run check and build tests
+
+  checks:
+    name: Code checks
+    uses: glenn20/python-ci/.github/workflows/check.yaml@v1
+
+  build:
+    name: Build
+    uses: glenn20/python-ci/.github/workflows/build.yaml@v1
+
+  publish-test:
+    name: Publish to test.pypi
+    needs: build
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    uses: ./.github/workflows/publish.yaml
+    with:
+      pypi: test.pypi
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing!
