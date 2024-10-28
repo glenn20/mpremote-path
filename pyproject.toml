@@ -11,8 +11,19 @@ readme = "README.md"
 license = {text = "MIT"}
 classifiers = [
     "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Embedded Systems",
+    "Topic :: Software Development :: Libraries",
+    "Typing :: Typed",
 ]
 requires-python = ">=3.9"
 dependencies = [
@@ -47,17 +58,19 @@ dev-dependencies = [
   "types-pyserial>=3.5",
   # For running tests: pytest, pyyaml, requests, tox, mypy, ruff
   "pytest>=8.3.2",
-  "pyyaml>=6.0.2",
-  "tox>=4.0.0",
-  "tox-uv>=0.3.0",  # uv support for tox
   "pytest-cov>=3.0.0",
+  "pyyaml>=6.0.2",  # For logging configuration in tests/
   "mypy>=0.910",  # For code type checks: uv run mypy --no-sources mypy src
   "ruff>=0.6.7",  # For linting: uv run --no-sources ruff format --check src
+  "tox>=4.0.0",
+  "tox-uv>=0.3.0",  # uv support for tox
   "keyring>=25",  # For uv publish --keyring-provider=subprocess
   # Used by .git/hooks/post-{commit,checkout} to update _version.py:
   #   uv run --frozen hatch build --hooks-only
   "hatch>=1.12.0",
   "hatch-vcs>=0.3.0",  # For building and updating _version.py
+  "pre-commit>=2.9.2",  # For running ruff and mypy on Python files
+  "pre-commit-uv>=4.0",
 ]
 
 [tool.mypy]
@@ -94,12 +107,12 @@ env.clean.commands = [["coverage", "erase"]]  # Cleanup coverage data
 env.clean.deps = ["coverage"]
 env.clean.skip_install = true
 env.mypy.commands = [["mypy"]]
-env.mypy.deps = ["mypy", "pytest", "types-requests", "types-pyserial"]
+env.mypy.deps = ["mypy", "types-pyserial"]
 env.lint.commands = [["ruff", "check"]]
 env.lint.deps = ["ruff"]
 env.format.commands = [["ruff", "format", "--check"]]
 env.format.deps = ["ruff"]
 env_run_base.commands = [["pytest", {replace = "posargs", extend = true}]]
-env_run_base.deps = ["pytest", "pytest-cov", "requests", "pyyaml"]
+env_run_base.deps = ["pytest", "pytest-cov", "pyyaml"]
 env_run_base.package = "editable"
 env_run_base.runner = "uv-venv-runner"
