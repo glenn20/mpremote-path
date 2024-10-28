@@ -46,6 +46,13 @@ def pytest_addoption(parser: argparse.Namespace) -> None:
     )
 
 
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    # Ignore exit status 5 (no tests collected)
+    # We skip all tests when running on GitHub Actions
+    if exitstatus == 5:
+        session.exitstatus = 0  # Ignore exit status 5 (no tests collected)
+
+
 def rm_recursive(path: Path) -> None:
     """Remove a directory and all it's contents recursively."""
     if not path.exists():

@@ -531,7 +531,7 @@ wheels = [
 
 [[package]]
 name = "mpremote-path"
-version = "0.1.4.dev1"
+version = "0.1.4.dev6"
 source = { editable = "." }
 dependencies = [
     { name = "mpremote" },
@@ -552,6 +552,7 @@ dev = [
     { name = "tox" },
     { name = "tox-uv" },
     { name = "types-pyserial" },
+    { name = "types-pyyaml" },
 ]
 
 [package.metadata]
@@ -567,11 +568,12 @@ dev = [
     { name = "pre-commit-uv", specifier = ">=4.0" },
     { name = "pytest", specifier = ">=8.3.2" },
     { name = "pytest-cov", specifier = ">=3.0.0" },
-    { name = "pyyaml", specifier = ">=6.0.2" },
+    { name = "pyyaml", specifier = ">=6.0.0" },
     { name = "ruff", specifier = ">=0.6.7" },
     { name = "tox", specifier = ">=4.0.0" },
     { name = "tox-uv", specifier = ">=0.3.0" },
     { name = "types-pyserial", specifier = ">=3.5" },
+    { name = "types-pyyaml", specifier = ">=6.0.0" },
 ]
 
 [[package]]
@@ -1023,6 +1025,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/89/83/5be4b489d478b0935cdb60e454c97dadc2bcf969deb12fb200f88f0aa289/types-pyserial-3.5.0.20240826.tar.gz", hash = "sha256:c88c603734410ad714fba85eb10f145dc592ccf1542bb958f12a8481722f37db", size = 14399 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ea/9f/beb73722f2793a222d8234121f7686db9467c5cde8fc8ef374d3f1eeb543/types_pyserial-3.5.0.20240826-py3-none-any.whl", hash = "sha256:f3fddafe593060afeec489ed6f6a18dcf05ae5eae1c8e9026b50c7960f00b076", size = 20176 },
+]
+
+[[package]]
+name = "types-pyyaml"
+version = "6.0.12.20240917"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/92/7d/a95df0a11f95c8f48d7683f03e4aed1a2c0fc73e9de15cca4d38034bea1a/types-PyYAML-6.0.12.20240917.tar.gz", hash = "sha256:d1405a86f9576682234ef83bcb4e6fff7c9305c8b1fbad5e0bcd4f7dbdc9c587", size = 12381 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9e/2c/c1d81d680997d24b0542aa336f0a65bd7835e5224b7670f33a7d617da379/types_PyYAML-6.0.12.20240917-py3-none-any.whl", hash = "sha256:392b267f1c0fe6022952462bf5d6523f31e37f6cea49b14cee7ad634b6301570", size = 15264 },
 ]
 
 [[package]]

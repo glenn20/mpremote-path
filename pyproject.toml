@@ -55,11 +55,12 @@ version.raw-options.git_describe_command = [
 [tool.uv]
 dev-dependencies = [
   # For development environment, including type checking
-  "types-pyserial>=3.5",
+  "types-pyserial>=3.5",  # For type checking pyserial (needed by mpremote)
   # For running tests: pytest, pyyaml, requests, tox, mypy, ruff
+  "pyyaml>=6.0.0",  # For logging configuration in tests/
+  "types-pyyaml>=6.0.0",
   "pytest>=8.3.2",
   "pytest-cov>=3.0.0",
-  "pyyaml>=6.0.2",  # For logging configuration in tests/
   "mypy>=0.910",  # For code type checks: uv run mypy --no-sources mypy src
   "ruff>=0.6.7",  # For linting: uv run --no-sources ruff format --check src
   "tox>=4.0.0",
@@ -107,7 +108,7 @@ env.clean.commands = [["coverage", "erase"]]  # Cleanup coverage data
 env.clean.deps = ["coverage"]
 env.clean.skip_install = true
 env.mypy.commands = [["mypy"]]
-env.mypy.deps = ["mypy", "types-pyserial"]
+env.mypy.deps = ["mypy", "types-pyserial", "types-pyyaml"]
 env.lint.commands = [["ruff", "check"]]
 env.lint.deps = ["ruff"]
 env.format.commands = [["ruff", "format", "--check"]]
