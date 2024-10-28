@@ -13,20 +13,16 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Can't run pytest tests as they require hardware-in-the-loop
-  # So, just run check and build tests
-
-  checks:
-    name: Code checks
-    uses: glenn20/python-ci/.github/workflows/check.yaml@v1
-
-  build:
-    name: Build
-    uses: glenn20/python-ci/.github/workflows/build.yaml@v1
+  tests:
+    name: CI tests
+    uses: glenn20/python-ci/.github/workflows/check-test-build.yaml@v1
+    with:  # A short test matrix for fast testing of commits
+      os: '["ubuntu-latest"]'
+      python-version: '["3.9", "3.13"]'
 
   publish-test:
     name: Publish to test.pypi
-    needs: build
+    needs: tests
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'push' && github.ref == 'refs/heads/main')

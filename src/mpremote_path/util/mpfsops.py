@@ -3,7 +3,7 @@
 Includes functions for copying, moving and removing multiple files and
 directories locally, or on serial attached micropython boards.
 
-These functions opetrate on files specified as `Path` or `MPath` instances. Use
+These functions operate on files specified as `Path` or `MPath` instances. Use
 the `mpfscmd` sub-module to operate on files specified as strings or lists of
 strings.
 """
