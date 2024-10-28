@@ -1,8 +1,15 @@
 import itertools
+import os
 from pathlib import Path
 from typing import Iterable
 
+import pytest
+
 from mpremote_path import MPRemotePath as MPath
+
+# These tests require a micropython board to be connected to the host.
+if os.getenv("GITHUB_ACTIONS"):
+    pytest.skip("Skipping tests in CI workflow", allow_module_level=True)
 
 
 def copy_recursive(src: Path, dst: Path) -> None:

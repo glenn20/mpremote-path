@@ -1,9 +1,16 @@
+import os
 from pathlib import Path
 
+import pytest
 from common import check_folders
 
 from mpremote_path import MPRemotePath as MPath
 from mpremote_path.util import mpfs as fscmd
+
+# These tests require a micropython board to be connected to the host.
+if os.getenv("GITHUB_ACTIONS"):
+    pytest.skip("Skipping tests in CI workflow", allow_module_level=True)
+
 
 # The `root` fixture saves the current working directory, cd's to the root
 # folder and passes in the path of the root directory of the micropython board.

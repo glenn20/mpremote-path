@@ -1,9 +1,14 @@
+import os
 import stat
 from shutil import SameFileError
 
 import pytest
 
 from mpremote_path import MPRemotePath as MPath
+
+# These tests require a micropython board to be connected to the host.
+if os.getenv("GITHUB_ACTIONS"):
+    pytest.skip("Skipping tests in CI workflow", allow_module_level=True)
 
 # The `root` fixture saves the current working directory, cd's to the root
 # folder and passes in the path of the root directory of the micropython board.
@@ -17,7 +22,7 @@ from mpremote_path import MPRemotePath as MPath
 # test fixture is torn down.
 
 
-def test_root_folder(root: MPath):
+def test_root_folder(root: MPath) -> None:
     """Test the RemotePath class."""
     p = MPath("/")
     assert p.exists() is True
@@ -163,9 +168,9 @@ def test_open_bytes(testfolder: MPath) -> None:
     assert p.stat().st_size == len(msg)
     msg2 = p.read_bytes()
     assert msg2 == msg
-    f = p.open("rb")
-    msg3 = f.read()
-    f.close()
+    f2 = p.open("rb")
+    msg3 = f2.read()
+    f2.close()
     assert msg3 == msg
     p.unlink()
     assert p.exists() is False
