@@ -1,5 +1,21 @@
 # `mpremote_path` - a pathlib interface for files on micropython boards
 
+[![PyPI](
+  https://img.shields.io/pypi/v/mpremote-path)](
+  https://pypi.org/project/mpremote-path)
+[![PyPI Supported Python Versions](
+  https://img.shields.io/pypi/pyversions/mpremote-path.svg)](
+  https://pypi.python.org/pypi/mpremote-path/)
+[![GitHub Actions (Tests)](
+  https://github.com/glenn20/mpremote-path/actions/workflows/ci-tests.yaml/badge.svg)](
+  https://github.com/glenn20/mpremote-path/actions/workflows/ci-tests.yaml)
+[![GitHub Actions (Publish)](
+  https://github.com/glenn20/mpremote-path/actions/workflows/ci-release.yaml/badge.svg)](
+  https://github.com/glenn20/mpremote-path/actions/workflows/ci-release.yaml)
+[![PyPI - License](
+  https://img.shields.io/pypi/l/mpremote-path)](
+  https://opensource.org/licenses/MIT)
+
 Provides a convenient,
 [`pathlib`](https://docs.python.org/3/library/pathlib.html) compatible python
 interface to access and manipulate files on a serial-attached
@@ -13,15 +29,25 @@ Version 0.1.2 passes all tests on windows and linux for python versions 3.8,
 
 **Contents:**
 
-**[`mpremote_path`](#features) module: [Features](#features) | [Installation](#installation) | [API Docs](#api-docs-mpremote_path-module)**
+**[`mpremote_path`](#features) module:
+  [Features](#features) |
+  [Installation](#installation) |
+  [API Docs](#api-docs-mpremote_path-module)**
+
+- A module providing `pathlib`-like access to files on a serial-attached
+  micropython board from a host computer.
 
 **[`mpremote_path.util.mpfs`](#mpremote_pathutilmpfs-module) module:
-[Features](#mpfs-features) | [API Docs -
-Functions](#mpremote_pathutilmpfs-functions)**
+  [Features](#mpfs-features) |
+  [API Docs - Functions](#mpremote_pathutilmpfs-functions)**
+
+- Provides convenience methods for working with files using the `mpremotepath`
+  module. Includes the `mpfs` command line utility for managing files on a
+  serial-attached micropython board.
 
 **[`mpremote_path.util.mpfsops`](#mpremote_pathutilmpfsops-module) module:
-[Features](#mpfsops-features) | [API Docs -
-Functions](#mpremote_pathutilmpfsops-functions)**
+  [Features](#mpfsops-features) |
+  [API Docs - Functions](#mpremote_pathutilmpfsops-functions)**
 
 ## Features
 
@@ -71,10 +97,10 @@ def rcopy(src: Path, dst: Path) -> None:
 
 MPath.connect("u0")               # Use device attached to /dev/ttyUSB0
 
-# Make a local copy of a directory
+# Make a local copy of a directory on the host computer
 rcopy(Path("app"), Path("../app-backup"))
 
-# Copy local directory to the micropython board
+# Copy local directory from computer to serial-attached micropython board
 rcopy(Path("app"), MPath("/lib/app"))
 
 # Copy a directory from the micropython board to the local disk
@@ -83,38 +109,25 @@ rcopy(MPath("/lib"), Path("./lib2"))
 
 ## Installation
 
-First, clone this github repo into a folder somewhere:
+If you use a python virtual environment (recommended), make sure it is active.
+
+### Install from PYPI
+
+- Using pip: `pip install mpremote-path`, or
+- Using uv: `uv pip install mpremote-path`.
+
+### Install from github source
+
+I recommend using uv to install and manage dependencies and dev environments.
 
 ```bash
 git clone https://github.com/glenn20/mpremote-path
 cd mpremote-path
+uv build  # To build an installable .whl file
+uv tool install dist/mpremote-path-0.1.4-py3-none-any.whl
 ```
 
-If you use a python virtual environment (recommended), make sure it is active.
-
-To install in your python environment:
-
-- Prerequisites (`mpremote`):
-
-  ```bash
-  pip install -r requirements.txt
-  ```
-
-- Install in ["editable
-  mode"](https://setuptools.pypa.io/en/latest/userguide/development_mode.html):
-
-  ```bash
-  pip install -e .
-  ```
-
-- OR build and install a distributable `.whl` package
-
-  ```bash
-  python -m build
-  pip install dist/mpremote-path*.whl
-  ```
-
-*Optional*: Run the test suite (requires pytest module: `pip install pytest`):
+*Optional*: Run the test suite with: `uv run pytest` or `uv run tox`.
 
 - Warning: running these tests will create and delete files and subdirectories
 in a new folder on the micropython board: `/_tests`.
@@ -209,7 +222,7 @@ tests/test_recursive_copy.py::test_recursive_rm PASSED                   [100%]
       `with_segments(*pathsegments)`
   - *Operators*:
     - `/`: the slash operator concatenates path segments to create child paths,
-      - eg. `lib = MPRemotePath("/lib); pkg_dir = lib / "pkg"`.
+      - eg. `lib = MPRemotePath("/lib"); pkg_dir = lib / "pkg"`.
 
 - Inherits or overrides from
   [pathlib.Path](https://docs.python.org/3/library/pathlib.html#pathlib.Path):
@@ -219,11 +232,12 @@ tests/test_recursive_copy.py::test_recursive_rm PASSED                   [100%]
       `group()`, `is_dir()`, `is_file()`, `is_junction()`, `is_mount()`,
       `samefile(other)`, `is_symlink()`, `is_socket()`, `is_fifo()`,
       `is_block_device()`, `is_char_device()`, `iterdir()`, `walk()`, `lstat()`,
-      `mkdir()`, `owner()`, `read_bytes()`, `read_text()`, `rename(target)`,
-      `replace(target)`, `absolute()`, `resolve()`, `rglob(pattern)`, `rmdir()`,
-      `touch()`, `unlink()`, `write_bytes(data)`, `write_text(text)`
+      `mkdir()`, `owner()`, `open()`, `read_bytes()`, `read_text()`,
+      `rename(target)`, `replace(target)`, `absolute()`, `resolve()`,
+      `rglob(pattern)`, `rmdir()`, `touch()`, `unlink()`, `write_bytes(data)`,
+      `write_text(text)`
   - *Will raise a `NotImplemented` exception*:
-    - `chmod()`, `lchmod()`, `open()`, `read_link()`, `symlimk_to(target)`,
+    - `chmod()`, `lchmod()`, `read_link()`, `symlimk_to(target)`,
       `hardlink_to(target)`
 
 ## `mpremote_path.util.mpfs` module
