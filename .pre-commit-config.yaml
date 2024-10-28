@@ -1,0 +1,36 @@
+repos:
+- repo: local
+  hooks:
+    - id: ruff
+      name: ruff
+      description: "Run 'ruff' for extremely fast Python linting"
+      entry: uv run ruff check --force-exclude --no-fix
+      always_run: true
+      language: python
+      types_or: [python, pyi, jupyter]
+      args: []
+      require_serial: true
+      additional_dependencies: []
+      minimum_pre_commit_version: "2.9.2"
+    - id: ruff-format
+      name: ruff-format
+      description: "Run 'ruff format' for extremely fast Python formatting"
+      entry: uv run ruff format --check --force-exclude
+      always_run: true
+      language: python
+      types_or: [python, pyi, jupyter]
+      args: []
+      require_serial: true
+      additional_dependencies: []
+      minimum_pre_commit_version: "2.9.2"
+    - id: mypy
+      name: mypy
+      entry: "uv run mypy"
+      always_run: true
+      language: python
+      types: [python]
+      # use require_serial so that script
+      # is only called once per commit
+      require_serial: true
+      # Print the number of files as a sanity-check
+      verbose: true
