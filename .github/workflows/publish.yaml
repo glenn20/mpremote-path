@@ -14,15 +14,15 @@ name: Publish python package
 #   1. For trusted publishing, the publishing workflow must be in the project
 #      repository, so copy this workflow file to
 #      `.github/workflows/publish.yaml` in your repository.
-#   2. Create the `publish-test.pypi` and `publish-pypi` Environments in your
-#      github repository (Settings->Environments->New Environment).
-#   3. Add this workflow as a "trusted publisher" on your pypi and test.pypi
-#      project pages (add the name of the relevant Environment for additional
-#      access control).
+#   2. Create the `publish-test.pypi` and `publish-upload.pypi` Environments in
+#      your github repository (Settings->Environments->New Environment).
+#   3. Add the name of this workflow file (publish.yaml) as a "trusted
+#      publisher" on your pypi and test.pypi project pages (add the name of the
+#      relevant Environment for additional access control).
 #   4. Call this workflow from a parent workflow with the `pypi` input set to
 #      "upload.pypi" or "test.pypi" (default).
 #
-#   Invoke with `uses: ./.github/workflows/publish@v1`
+#   Invoke with `uses: ./.github/workflows/publish.yaml` from a parent workflow.
 
 on:
   workflow_call:

@@ -1,5 +1,6 @@
 default_install_hook_types: [pre-commit, pre-merge-commit, pre-push]
 default_stages: [pre-commit, pre-merge-commit, pre-push, manual]
+exclude: (^tests/.*/.*$)
 repos:
 - repo: local
   hooks:
@@ -27,7 +28,8 @@ repos:
       minimum_pre_commit_version: "2.9.2"
     - id: mypy
       name: mypy
-      entry: "uv run mypy"
+      entry: uv run mypy
+      files: ^(src|tests)/.*\.py$
       always_run: true
       language: python
       types: [python]
