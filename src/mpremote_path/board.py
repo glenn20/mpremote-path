@@ -13,15 +13,13 @@ import re
 import sys
 import time
 from contextlib import contextmanager
+from functools import cached_property
 from typing import (
-    TYPE_CHECKING,
     Any,
     Callable,
     Generator,
-    Literal,
     TypeVar,
     cast,
-    overload,
 )
 
 import mpremote.transport_serial
@@ -29,7 +27,9 @@ from mpremote.transport_serial import SerialTransport, TransportError
 
 logger = logging.getLogger(__name__)
 
-time_offset_tolerance = 1  # seconds
+# Tolerance for time offset between host and board (seconds) if
+# `set_clock=True` in `Board.check_clock()`.
+board_time_offset_tolerance = 1.0  # seconds
 
 
 # Override the mpremote stdout writer which fails if stdout does not have a
@@ -75,18 +75,13 @@ def make_board(
     """Convenience function to return a `Board` instance from a serial port name
     or a `SerialTransport` object or an existing `Board` instance. The serial
     port name may be the full device name (eg. "/dev/ttyUSB0") or a short name
-    (eg. "u0")."""
+    (eg. "u0"). Calls `Board.check_clock()` to synchronise the board's clock
+    according to the `set_clock` and `utc` arguments."""
     board = (
-        port
-        if isinstance(port, Board)
-        else (
-            Board(port, writer=writer)
-            if isinstance(port, SerialTransport)
-            else Board(
-                SerialTransport(device_long_name(port), baud, wait), writer=writer
-            )
-        )
-    )
+        port if isinstance(port, Board) else
+        Board(port, writer=writer) if isinstance(port, SerialTransport) else
+        Board(SerialTransport(device_long_name(port), baud, wait), writer=writer)
+    )  # fmt: off
     board.check_clock(set_clock=set_clock, utc=utc)
     return board
 
@@ -128,8 +123,13 @@ class Board:
         `check_clock()`.
     """
 
+    _transport: SerialTransport
+    _writer: Callable[[bytes], None] | None
+
     def __init__(
-        self, transport: SerialTransport, writer: Callable[[bytes], None] | None = None
+        self,
+        transport: SerialTransport,
+        writer: Callable[[bytes], None] | None = None,
     ) -> None:
         """Create a `Board` instance from an mpremote `SerialTransport` instance
         and, optionally, a writer function.
@@ -138,11 +138,22 @@ class Board:
         function is provided, the default writer will print to stdout."""
         self._transport = transport
         self._writer = writer
-        self.epoch_offset: int = 0
-        self.clock_offset: int = 0
+
+    def close(self) -> None:
+        """Close the connection to the micropython board."""
+        if self._transport:
+            self._transport.close()
 
     def __repr__(self) -> str:
         return f"Board({self.short_name!r})"
+
+    @cached_property
+    def epoch_offset(self) -> int:
+        return self.calc_epoch_offset()
+
+    @cached_property
+    def clock_offset(self) -> float:
+        return self.calc_clock_offset()
 
     @property
     def device_name(self) -> str:
@@ -192,6 +203,9 @@ class Board:
                 self._transport.read_until(4, b">>> ")
 
     def soft_reset(self) -> None:
+        """Perform a micropython soft reset of the board."""
+        if self._transport.in_raw_repl:
+            raise RuntimeError("Cannot reset micropython while in raw repl mode.")
         self._transport.enter_raw_repl(soft_reset=True)
         self._transport.exit_raw_repl()
 
@@ -204,32 +218,20 @@ class Board:
         with self.raw_repl(code) as r:
             return r.exec(code, None if capture else self.writer).decode().strip()
 
-    if TYPE_CHECKING:
-
-        @overload
-        def _eval(self, expression: str, parse: Literal[False]) -> str: ...
-        @overload
-        def _eval(self, expression: str, parse: bool = False) -> Any: ...
-
     @logmethod
-    def _eval(self, expression: str, parse: bool = False) -> Any:
-        """Wrapper around the mpremote `SerialTransport.eval()` method."""
-        with self.raw_repl(expression) as r:
-            result = r.eval(expression, parse)
-            if not parse and isinstance(result, bytes):
-                return result.decode()
-            else:
-                return result
-
     def eval(self, expression: str) -> Any:
         """Execute `expression` on the micropython board and evaluate the
         output as a python expression on the local host."""
-        return self._eval(expression, parse=True)
+        with self.raw_repl(expression) as r:
+            return r.eval(expression, True)
 
+    @logmethod
     def eval_str(self, expression: str) -> str:
         """Execute `expression` on the micropython board and return the output
         as a python string."""
-        return self._eval(expression, parse=False)
+        with self.raw_repl(expression) as r:
+            result = r.eval(expression, False)
+            return result.decode()
 
     def exec_eval(self, code: str) -> Any:
         """Execute `code` on the micropython board and (safely) evaluate the
@@ -237,42 +239,63 @@ class Board:
         response = self.exec(code, capture=True)
         return ast.literal_eval(response) if response else None
 
+    @logmethod
+    def fs_stat(self, filename: str) -> os.stat_result:
+        """Wrapper around the mpremote `SerialTransport.fs_stat()` method.
+        Converts the micropython timestamps to a unix timestamp by adding the
+        epoch offset calculated by `Board.calc_epoch_offset()`. Note: does not
+        correct for differences between the host clock and the micropython
+        clock. Use `Board.check_clock(set_clock=True)` to synchronise the
+        clocks."""
+        with self.raw_repl() as r:
+            stat = r.fs_stat(filename)
+            return os.stat_result(  # Add epoch_offset to the micropython timestamps
+                stat[:-3] + tuple((t + self.epoch_offset for t in stat[-3:]))
+            )
+
+    def calc_epoch_offset(self) -> int:
+        """Calculate the epoch offset between the host and the board."""
+        with self.raw_repl():
+            self.exec("import time")
+            gmt_now = time.gmtime(time.time())[:8]  # Use now as a reference time
+            host_time = time.mktime((*gmt_now, -1))
+            board_time = float(self.eval(f"time.mktime({gmt_now})"))
+            return round(host_time - board_time)
+
+    def calc_clock_offset(self) -> float:
+        """Calculate the offset (seconds) of the board's RTC from the host clock."""
+        with self.raw_repl():
+            offset = self.epoch_offset  # Ensure we call this first to "import time"
+            board_time = int(self.eval("time.time()"))
+            local_time = time.time()
+            return board_time + offset - local_time
+
+    def sync_clock(
+        self,
+        sync_time: time.struct_time | float | int | None = None,
+        utc: bool = False,
+    ) -> None:
+        """Set the board's real-time clock to the host's time (utc or local).
+        If `sync_time` is provided, the board clock will be set to that time.
+        `sync_time` may be a `time.struct_time` object, a unix timestamp or None."""
+        t: time.struct_time = (
+            sync_time if isinstance(sync_time, time.struct_time) else
+            time.gmtime(sync_time) if utc else
+            time.localtime(sync_time)  # Use now if sync_time is None
+        )  # fmt: off
+        host_time = t.tm_year, t.tm_mon, t.tm_mday, 0, t.tm_hour, t.tm_min, t.tm_sec, 0
+        self.exec(
+            "import machine; "
+            f"if hasattr(machine, 'RTC'): machine.RTC().datetime({host_time})"
+        )
+
     def check_clock(self, set_clock: bool = False, utc: bool = False) -> None:
         """Check the time on the board and save the epoch offset and clock
         offset between the host and the board (in seconds). Will sync the
         board's RTC to the host's time if `set_clock` is True. Will use UTC time
         if `utc` is True, otherwise local time will be used."""
         with self.raw_repl():  # Wrapper so we only enter/exit raw repl mode once
-            self.exec("import time, machine" if set_clock else "import time")
-            # Calculate the epoch offset between the host and the board.
-            tt = time.gmtime(time.time())[:8]  # Use now as a reference time
-            self.epoch_offset = round(
-                time.mktime((*tt, -1)) - int(self.eval(f"time.mktime({tt})"))
-            )
-            # Calculate the offset (seconds) of the board's RTC from the host clock.
-            self.clock_offset = round(
-                int(self.eval("time.time()")) + self.epoch_offset - time.time()
-            )
-            t = time.gmtime() if utc else time.localtime()
-            t2 = (t.tm_year, t.tm_mon, t.tm_mday, 0, t.tm_hour, t.tm_min, t.tm_sec, 0)
-            if set_clock and abs(self.clock_offset) > time_offset_tolerance:
-                # Set the board's RTC to the host's time
-                self.exec(f"machine.RTC().datetime({t2})")
-                self.clock_offset = round(  # recalculate time offset
-                    int(self.eval("time.time()")) + self.epoch_offset - time.time()
-                )
-
-    @logmethod
-    def fs_stat(self, filename: str) -> os.stat_result:
-        """Wrapper around the mpremote `SerialTransport.fs_stat()` method.
-        Converts the micropython timestamps to a unix timestamp by adding the
-        epoch offset calculated by `Board.check_clock()`. Note: does not correct
-        for differences between the host clock and the micropython clock. Use
-        `Board.check_clock(set_clock=True)` to synchronise the clocks."""
-        with self.raw_repl() as r:
-            stat = r.fs_stat(filename)
-        if stat is None:
-            raise FileNotFoundError(f"No such file or directory: '{self}'")
-        return os.stat_result(  # Add epoch_offset to the micropython timestamps
-            stat[:-3] + tuple((t + self.epoch_offset for t in stat[-3:]))
-        )
+            # Calculate the offset (seconds) of the board clock from the host clock.
+            if set_clock and abs(self.clock_offset) > board_time_offset_tolerance:
+                self.sync_clock(utc=utc)
+                del self.clock_offset  # Force recalculation of clock_offset

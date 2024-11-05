@@ -104,7 +104,7 @@ class MPRemoteDirEntry:
         return stat.S_ISLNK(self._stat.st_mode)
 
     def stat(self, *, follow_symlinks: bool = True) -> os.stat_result:
-        if self._stat is None:  # Get the full os.stat() result
+        if self._stat.st_mode == 0:  # Get the full os.stat() result
             self._stat = self._board.fs_stat(self.path)
             if self._stat.st_mtime == 0:  # Fetch the mtime from the board
                 mtime = self._board.eval(f"os.stat({self.path!r})[8]")
@@ -115,7 +115,7 @@ class MPRemoteDirEntry:
 # Path.glob(), Path.rglob(), Path.walk() and Path.iterdir() rely on _scandir()
 # Can't use @contextmanager decorator because it doesn't work with broken
 # pathlib.rglob()/walk() on python 3.12.
-class ScanDir:
+class MPRemoteScanDir:
     def __init__(self, board: Board, path: str):
         #  Wrap all the file ops in a single raw repl
         with board.raw_repl():
@@ -125,7 +125,7 @@ class ScanDir:
             )
             self.result = (MPRemoteDirEntry(board, path, *f) for f in files)
 
-    def __enter__(self) -> ScanDir:
+    def __enter__(self) -> MPRemoteScanDir:
         return self
 
     def __exit__(self, *_exc: Any) -> None:
@@ -151,12 +151,12 @@ if hasattr(Path, "_accessor"):
         @staticmethod
         def listdir(path: str) -> list[str]:
             path = PureWindowsPath(path).as_posix() if os.name == "nt" else path
-            return [p.name for p in ScanDir(MPRemotePath.board, path)]
+            return [p.name for p in MPRemoteScanDir(MPRemotePath.board, path)]
 
         @staticmethod
-        def scandir(path: str) -> ScanDir:
+        def scandir(path: str) -> MPRemoteScanDir:
             path = PureWindowsPath(path).as_posix() if os.name == "nt" else path
-            return ScanDir(MPRemotePath.board, path)
+            return MPRemoteScanDir(MPRemotePath.board, path)
 
     _mpremote_accessor = _MPRemoteAccessor()
 
@@ -171,12 +171,12 @@ if sys.version_info >= (3, 13):
             return MPRemotePath.board.fs_stat(path)
 
         @staticmethod
-        def scandir(path: str) -> ScanDir:
+        def scandir(path: str) -> MPRemoteScanDir:
             path = PureWindowsPath(path).as_posix() if os.name == "nt" else path
-            return ScanDir(MPRemotePath.board, path)
+            return MPRemoteScanDir(MPRemotePath.board, path)
 
 
-class PathWriter(io.BytesIO):
+class MPRemotePathWriter(io.BytesIO):
     """File object that flushes its contents to a micropython file on close.
     Returned by MPRemotePath.open(mode="w").
     """
@@ -257,8 +257,14 @@ class MPRemotePath(Path, PurePosixPath):
         cls.board = make_board(port, baud, wait, set_clock=set_clock, utc=utc)
         cls.board.exec("import os")
 
+    @classmethod
+    def disconnect(cls) -> None:
+        """Disconnect from the micropython board."""
+        if cls.board:
+            cls.board.close()
+
     def chdir(self) -> MPRemotePath:
-        "Set the current working directory on the board to this path." ""
+        "Set the current working directory on the board to this path."
         p = self.resolve()
         self.board.exec(f"os.chdir('{p}')")
         return p
@@ -268,16 +274,6 @@ class MPRemotePath(Path, PurePosixPath):
         if self.samefile(target):
             raise SameFileError(f"{self!s} and {target!s} are the same file")
         target.write_bytes(self.read_bytes())
-        # with self.board.raw_repl() as r:
-        #     r.fs_writefile(str(target), r.fs_readfile(str(self)))
-        # r.exec(
-        #     "def _f(a,b):\n"
-        #     " b=memoryview(bytearray(512))\n"
-        #     " with open(a,'rb') as s, open(b,'wb') as t:\n"
-        #     "  while n:=s.readinto(b):\n"
-        #     "   t.write(b[:n])\n"
-        #     f"_f({str(self)!r},{str(target)!r})"
-        # )
         return target
 
     def copy(self, target: MPRemotePath | str) -> MPRemotePath:
@@ -297,11 +293,11 @@ class MPRemotePath(Path, PurePosixPath):
         return cls("/")
 
     # Path.glob(), Path.rglob(), Path.walk() and Path.iterdir() rely on _scandir()
-    def _scandir(self) -> ScanDir:
+    def _scandir(self) -> MPRemoteScanDir:
         """Override for Path._scandir(): returns a context manager which produces an
         iterable of information about the files in a folder. This is used by
         `glob()`, `rglob()` and `walk()`."""
-        return ScanDir(self.board, str(self))
+        return MPRemoteScanDir(self.board, str(self))
 
     def _from_direntry(self, entry: MPRemoteDirEntry) -> MPRemotePath:
         """Create a new `MPRemotePath` instance from a `MPRemoteDirEntry`
@@ -446,7 +442,7 @@ class MPRemotePath(Path, PurePosixPath):
             with self.board.raw_repl() as r:
                 fileobj = io.BytesIO(r.fs_readfile(str(self.resolve())))
         elif action == "w":
-            fileobj = PathWriter(self.board, str(self.resolve()))
+            fileobj = MPRemotePathWriter(self.board, str(self.resolve()))
         else:
             raise io.UnsupportedOperation()
         if "b" not in mode:
