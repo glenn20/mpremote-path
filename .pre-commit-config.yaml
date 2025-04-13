@@ -2,34 +2,31 @@ default_install_hook_types: [pre-commit, pre-merge-commit, pre-push]
 default_stages: [pre-commit, pre-merge-commit, pre-push, manual]
 exclude: (^tests/.*/.*$)
 repos:
-- repo: local
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.6.0
+  hooks:
+    - id: check-yaml
+    - id: end-of-file-fixer
+    - id: trailing-whitespace
+- repo: https://github.com/astral-sh/uv-pre-commit
+  rev: 0.6.13
+  hooks:
+    - id: uv-lock  # Ensure lockfile is up to date
+    - id: uv-export  # Export the lockfile to requirements.txt
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.11.4
   hooks:
     - id: ruff
-      name: ruff
-      description: "Run 'ruff' for extremely fast Python linting"
-      entry: uv run ruff check --force-exclude --no-fix
+      args: [ --no-fix]
       always_run: true
-      language: python
-      types_or: [python, pyi, jupyter]
-      args: []
-      require_serial: true
-      additional_dependencies: []
-      minimum_pre_commit_version: "2.9.2"
     - id: ruff-format
-      name: ruff-format
-      description: "Run 'ruff format' for extremely fast Python formatting"
-      entry: uv run ruff format --check --force-exclude
       always_run: true
-      language: python
-      types_or: [python, pyi, jupyter]
-      args: []
-      require_serial: true
-      additional_dependencies: []
-      minimum_pre_commit_version: "2.9.2"
+
+- repo: local
+  hooks:
     - id: mypy
       name: mypy
       entry: uv run mypy
-      files: ^(src|tests)/.*\.py$
       always_run: true
       language: python
       types: [python]

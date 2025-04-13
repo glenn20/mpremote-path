@@ -120,8 +120,7 @@ def remove(files: Iterable[Path], recursive: bool = False) -> None:
                 f.rmdir()
             else:
                 print(
-                    f"Skipping '{str(f)}/' "
-                    "(use `recursive=True` to delete directories)"
+                    f"Skipping '{str(f)}/' (use `recursive=True` to delete directories)"
                 )
 
 

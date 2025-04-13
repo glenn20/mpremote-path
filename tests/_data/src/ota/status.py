@@ -63,7 +63,7 @@ def partition_table() -> list[tuple[int, int, int, int, str, bool]]:
 def partition_table_print() -> None:
     ptype = {Partition.TYPE_APP: "app", Partition.TYPE_DATA: "data"}
     subtype = [
-        {0: "factory"} | {i: f"ota_{i-OTA_MIN}" for i in range(OTA_MIN, OTA_MAX)},
+        {0: "factory"} | {i: f"ota_{i - OTA_MIN}" for i in range(OTA_MIN, OTA_MAX)},
         {0: "ota", 1: "phy", 2: "nvs", 129: "fat"},  # DATA subtypes
     ]
     print("Partition table:")

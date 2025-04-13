@@ -15,6 +15,9 @@
 [![PyPI - License](
   https://img.shields.io/pypi/l/mpremote-path)](
   https://opensource.org/licenses/MIT)
+[![pre-commit](
+  https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](
+  https://github.com/pre-commit/pre-commit)
 
 Provides a convenient,
 [`pathlib`](https://docs.python.org/3/library/pathlib.html) compatible python
@@ -23,9 +26,7 @@ interface to access and manipulate files on a serial-attached
 computer. **mpremote-path** provides the `MPRemotePath` class which implements a
 `pathlib.Path` compatible interface to the file access features of the
 [mpremote](https://docs.micropython.org/en/latest/reference/mpremote.html) tool.
-
-Version 0.1.2 passes all tests on windows and linux for python versions 3.8,
-3.9, 3.10, 3.11, 3.12 and 3.13.
+Tested on Linux, Windows and MacOS.
 
 **Contents:**
 
