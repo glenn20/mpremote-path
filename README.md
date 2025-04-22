@@ -7,8 +7,8 @@
   https://img.shields.io/pypi/pyversions/mpremote-path.svg)](
   https://pypi.python.org/pypi/mpremote-path/)
 [![GitHub Actions (Tests)](
-  https://github.com/glenn20/mpremote-path/actions/workflows/ci-tests.yaml/badge.svg)](
-  https://github.com/glenn20/mpremote-path/actions/workflows/ci-tests.yaml)
+  https://github.com/glenn20/mpremote-path/actions/workflows/ci-test-build.yaml/badge.svg)](
+  https://github.com/glenn20/mpremote-path/actions/workflows/ci-test-build.yaml)
 [![GitHub Actions (Publish)](
   https://github.com/glenn20/mpremote-path/actions/workflows/ci-release.yaml/badge.svg)](
   https://github.com/glenn20/mpremote-path/actions/workflows/ci-release.yaml)
