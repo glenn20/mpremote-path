@@ -31,6 +31,8 @@ logger = logging.getLogger(__name__)
 # `set_clock=True` in `Board.check_clock()`.
 board_time_offset_tolerance = 1.0  # seconds
 
+default_baud_rate: int = 115200  # Default baud rate for serial connections
+
 
 # Override the mpremote stdout writer which fails if stdout does not have a
 # .buffer() method (eg. when running in a jupyter notebook)
@@ -63,27 +65,9 @@ def device_short_name(device: str) -> str:
     return device
 
 
-def make_board(
-    port: str | Board | SerialTransport,
-    baud: int = 115200,
-    wait: int = 0,
-    *,
-    set_clock: bool = False,
-    utc: bool = False,
-    writer: Callable[[bytes], None] | None = None,
-) -> Board:
-    """Convenience function to return a `Board` instance from a serial port name
-    or a `SerialTransport` object or an existing `Board` instance. The serial
-    port name may be the full device name (eg. "/dev/ttyUSB0") or a short name
-    (eg. "u0"). Calls `Board.check_clock()` to synchronise the board's clock
-    according to the `set_clock` and `utc` arguments."""
-    board = (
-        port if isinstance(port, Board) else
-        Board(port, writer=writer) if isinstance(port, SerialTransport) else
-        Board(SerialTransport(device_long_name(port), baud, wait), writer=writer)
-    )  # fmt: off
-    board.check_clock(set_clock=set_clock, utc=utc)
-    return board
+def make_board(*args: Any, **kwargs: Any) -> Board:
+    """Wrapper around `Board()` for backward compatibility."""
+    return Board(*args, **kwargs)
 
 
 T = TypeVar("T", bound=Callable[..., Any])
@@ -128,15 +112,30 @@ class Board:
 
     def __init__(
         self,
-        transport: SerialTransport,
+        port: str | SerialTransport,
+        *,
+        baud: int = 0,
+        wait: int = 0,
         writer: Callable[[bytes], None] | None = None,
     ) -> None:
-        """Create a `Board` instance from an mpremote `SerialTransport` instance
-        and, optionally, a writer function.
-        The writer function will be passed to `SerialTransport.exec()`  to print
-        output from code executed on the micropython board. If no writer
-        function is provided, the default writer will print to stdout."""
-        self._transport = transport
+        """
+        - `port` can be a string containing the full or abbreviated name of the
+          serial port or an mpremote `SerialTransport` instance.
+        - `baud` is the baud rate to use for the serial connection
+        - `wait` is the number of seconds to wait for the board to become
+          available when connecting.
+        - `writer` is a function that will be called with the data received
+          from the board. If not provided, the default writer will print to
+          stdout.
+
+        The serial port name may be the full device name (eg. "/dev/ttyUSB0")
+        or a short name (eg. "u0").
+
+        `baud` and `wait` are only used if `port` is a string."""
+        self._transport = (
+            port if isinstance(port, SerialTransport) else
+            SerialTransport(device_long_name(port), baud or default_baud_rate, wait)
+        )  # fmt: off
         self._writer = writer
 
     def close(self) -> None:

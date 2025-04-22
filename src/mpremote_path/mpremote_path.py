@@ -30,7 +30,7 @@ from typing import (
 
 from mpremote.transport_serial import SerialTransport
 
-from .board import Board, make_board
+from .board import Board
 
 if TYPE_CHECKING:
     from _typeshed import (
@@ -235,16 +235,15 @@ class MPRemotePath(Path, PurePosixPath):
     def connect(
         cls,
         port: str | Board | SerialTransport,
-        baud: int = 115200,
-        wait: int = 0,
         *,
-        set_clock: bool = False,
+        baud: int = 0,
+        wait: int = 0,
+        set_clock: bool = True,
         utc: bool = False,
     ) -> None:
         """Connect to the micropython board on the given `port`.
-        - `port` can be a `Board` instance, an mpremote `SerialTransport`
-          instance or a string containing the full or abbreviated name of the
-          serial port
+        - `port` can be a string containing the full or abbreviated name of the
+          serial port, a Board instance or an mpremote `SerialTransport` instance.
         - `baud` is the baud rate to use for the serial connection
         - `wait` is the number of seconds to wait for the board to become
           available.
@@ -254,7 +253,11 @@ class MPRemotePath(Path, PurePosixPath):
 
         `baud` and `wait` are only used if `port` is a string.
         """
-        cls.board = make_board(port, baud, wait, set_clock=set_clock, utc=utc)
+        cls.board = (
+            port if isinstance(port, Board) else
+            Board(port, baud=baud, wait=wait)
+        )  # fmt: skip
+        cls.board.check_clock(set_clock, utc)
         cls.board.exec("import os")
 
     @classmethod
