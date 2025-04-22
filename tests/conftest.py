@@ -52,7 +52,7 @@ def pytest_addoption(parser: argparse.Namespace) -> None:
         dest="baud",
         type=int,
         action="store",
-        default=115200,
+        default=921600,
         help="Baud rate for serial port: 115200",
     )
     parser.addoption(
