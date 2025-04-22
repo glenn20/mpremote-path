@@ -38,7 +38,7 @@ jobs:
   publish-pypi:
     name: Publish to pypi
     uses: ./.github/workflows/publish.yaml
-    needs: tests
+    needs: publish-test
     with:
       pypi: upload.pypi
     permissions:
@@ -47,7 +47,7 @@ jobs:
   github-release:
     name: Create GitHub release
     uses: glenn20/python-ci/.github/workflows/release.yaml@v1
-    needs: tests
+    needs: publish-pypi
     permissions:
       contents: write  # IMPORTANT: mandatory for github release
       id-token: write  # IMPORTANT: mandatory for github release

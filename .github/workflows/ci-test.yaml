@@ -1,0 +1,18 @@
+name: CI Tests (short)
+
+# Run the short code checks and CI pytest workflow on
+# - push to non main (eg. )`dev`) branches, or
+# - manually triggered from github Actions tab.
+
+on:
+  push:
+    branches-ignore: [main]
+  workflow_dispatch:
+
+jobs:
+  tests:
+    name: CI tests
+    uses: glenn20/python-ci/.github/workflows/check-test-build.yaml@v1
+    with:  # A short test matrix for fast testing of commits
+      os: '["ubuntu-latest"]'
+      python-version: '["3.9", "3.13"]'

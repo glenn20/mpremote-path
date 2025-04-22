@@ -9,23 +9,20 @@ name: Test and Build
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   tests:
-    name: CI tests
-    uses: glenn20/python-ci/.github/workflows/check-test-build.yaml@v1
-    with:  # A short test matrix for fast testing of commits
-      os: '["ubuntu-latest"]'
-      python-version: '["3.9", "3.13"]'
+    name: CI tests (full)
+    uses: glenn20/python-ci/.github/workflows/check-test-build.yaml@main
+    with:
+      os: '["ubuntu-latest", "windows-latest", "macos-latest"]'
+      python-version: '["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]'
 
   publish-test:
     name: Publish to test.pypi
     needs: tests
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main')
     uses: ./.github/workflows/publish.yaml
     with:
       pypi: test.pypi
