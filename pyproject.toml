@@ -10,6 +10,12 @@ classifiers = [
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Embedded Systems",
     "Topic :: Software Development :: Libraries",
     "Typing :: Typed",
@@ -71,7 +77,7 @@ exclude = ["_version.py", "tests/_data", "tests/unix-micropython"]
 lint.extend-select = ["I"]  # Enable ruffs isort rules (for compat with vscode ruff)
 
 [tool.coverage]
-run.source = ["src"]
+run.source = ["src", "tests"]
 run.omit = ["_version.py"]
 report.skip_covered = false
 append = true
@@ -82,7 +88,7 @@ env_list = [
     "clean", "typing", "lint", "format",
     "3.9", "3.10", "3.11", "3.12", "3.13"
 ]
-labels = { static = ["clean", "typing", "lint", "format"], test = ["3.13"] }
+labels = { static = ["clean", "typing", "lint", "format"], latest = ["3.13"] }
 dependency_groups = ["test"]
 env.clean.commands = [["coverage", "erase"]]  # Cleanup coverage data
 env.clean.skip_install = true
