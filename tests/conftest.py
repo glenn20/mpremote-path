@@ -35,10 +35,8 @@ if os.getenv("GITHUB_ACTIONS"):
     osname = platform.system()
     if osname == "Linux":
         subprocess.run("sudo apt-get install socat".split(), check=True)
-    elif osname == "Darwin":
-        subprocess.run("brew install socat".split(), check=True)
-    elif osname == "Windows":
-        raise RuntimeError("socat is not supported on Windows.")
+    else:
+        raise RuntimeError(f"Micropython unix port not supported on {osname}.")
 
 
 def pytest_addoption(parser: argparse.Namespace) -> None:

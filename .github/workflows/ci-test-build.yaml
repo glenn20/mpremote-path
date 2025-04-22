@@ -17,7 +17,7 @@ jobs:
     name: CI tests (full)
     uses: glenn20/python-ci/.github/workflows/check-test-build.yaml@main
     with:
-      os: '["ubuntu-latest", "windows-latest", "macos-latest"]'
+      os: '["ubuntu-latest"]'  # CI tests only run on linux
       python-version: '["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]'
 
   publish-test:
