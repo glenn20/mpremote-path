@@ -1,6 +1,7 @@
 import argparse
 import logging.config
 import os
+import platform
 import shutil
 import subprocess
 import time
@@ -31,7 +32,13 @@ logging.config.dictConfig(yaml.safe_load((tests_dir / "logging.yaml").read_text(
 
 # Install the socat package if running as a Github Action.
 if os.getenv("GITHUB_ACTIONS"):
-    subprocess.run("sudo apt-get install socat".split(), check=True)
+    osname = platform.system()
+    if osname == "Linux":
+        subprocess.run("sudo apt-get install socat".split(), check=True)
+    elif osname == "Darwin":
+        subprocess.run("brew install socat".split(), check=True)
+    elif osname == "Windows":
+        raise RuntimeError("socat is not supported on Windows.")
 
 
 def pytest_addoption(parser: argparse.Namespace) -> None:
