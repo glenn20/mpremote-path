@@ -19,6 +19,7 @@ board_test_dir = "/_tests"  # Directory to create for tests on the micropython b
 
 tests_dir = Path(__file__).parent  # Base directory for the tests.
 data_dir = tests_dir / "_data"  # Local directory containing test data files.
+logging_config = tests_dir / "logging.yaml"  # Logging configuration file.
 
 # Where to find the micropython unix port and the initialisation script.
 unix_dir = tests_dir / "unix-micropython"
@@ -28,7 +29,7 @@ unix_micropython_boot = unix_dir / "boot.py"  # Initialisation script.
 # Set the default serial port for the micropython board to use the unix port.
 default_port = "unix"
 
-logging.config.dictConfig(yaml.safe_load((tests_dir / "logging.yaml").read_text()))
+logging.config.dictConfig(yaml.safe_load(logging_config.read_text()))
 
 # Install the socat package if running as a Github Action.
 if os.getenv("GITHUB_ACTIONS"):
@@ -69,16 +70,16 @@ def pytest_addoption(parser: argparse.Namespace) -> None:
 
 def rm_recursive(path: Path) -> None:
     """Remove a directory and all it's contents recursively."""
-    if not path.exists():
-        return
+    if path.is_file():
+        path.unlink()
     elif path.is_dir():
         for child in path.iterdir():
             rm_recursive(child)
         path.rmdir()
-    elif path.is_file():
-        path.unlink()
-    else:
+    elif path.exists():
         raise ValueError(f"{path} is not a directory or file")
+    else:
+        pass
 
 
 @pytest.fixture(scope="session")
