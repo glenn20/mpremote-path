@@ -25,6 +25,8 @@ from typing import (
 import mpremote.transport_serial
 from mpremote.transport_serial import SerialTransport, TransportError
 
+from ._version import __version__
+
 logger = logging.getLogger(__name__)
 
 # Tolerance for time offset between host and board (seconds) if
@@ -132,9 +134,12 @@ class Board:
         or a short name (eg. "u0").
 
         `baud` and `wait` are only used if `port` is a string."""
+        baud = baud or default_baud_rate
+        logger.debug(f"{__name__.split('.')[0]} version {__version__}")
+        logger.debug(f"{self.__class__.__name__}({port!r}, baud={baud}, wait={wait})")
         self._transport = (
             port if isinstance(port, SerialTransport) else
-            SerialTransport(device_long_name(port), baud or default_baud_rate, wait)
+            SerialTransport(device_long_name(port), baud, wait)
         )  # fmt: off
         self._writer = writer
 
