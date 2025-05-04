@@ -12,7 +12,7 @@ on:
 jobs:
   tests:
     name: CI tests
-    uses: glenn20/python-ci/.github/workflows/ci-tox.yaml@main
+    uses: glenn20/python-ci/.github/workflows/ci-tox.yaml@dev
     with:  # A short test matrix for fast testing of commits
       os: '["ubuntu-latest"]'  # CI tests only run on linux
       python-version: '["3.9", "3.13"]'
