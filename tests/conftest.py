@@ -34,7 +34,9 @@ logging.config.dictConfig(yaml.safe_load(logging_config.read_text()))
 # Install the socat package if running as a Github Action.
 if os.getenv("GITHUB_ACTIONS"):
     osname = platform.system()
+    print(f"Running on {osname!r} in Github Actions.")
     if osname == "Linux":
+        print("Installing socat for Github Actions...")
         subprocess.run("sudo apt-get install socat".split(), check=True)
     else:
         raise RuntimeError(f"Micropython unix port not supported on {osname}.")
