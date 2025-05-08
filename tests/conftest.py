@@ -32,6 +32,8 @@ default_port = "unix"
 logging.config.dictConfig(yaml.safe_load(logging_config.read_text()))
 
 # Install the socat package if running as a Github Action.
+print("Check environment variables for Github Actions.")
+print(os.environ)
 if os.getenv("GITHUB_ACTIONS"):
     osname = platform.system()
     print(f"Running on {osname!r} in Github Actions.")
