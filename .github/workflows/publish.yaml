@@ -49,7 +49,7 @@ jobs:
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
     steps:
-      - uses: glenn20/python-ci/publish@v1
+      - uses: glenn20/python-ci/publish@dev
         id: publish
         with:
           pypi: ${{ inputs.pypi }}

@@ -15,7 +15,7 @@ on:
 jobs:
   tests:
     name: CI tests (full)
-    uses: glenn20/python-ci/.github/workflows/ci-tox.yaml@main
+    uses: glenn20/python-ci/.github/workflows/ci-tox.yaml@dev
     with:
       os: '["ubuntu-latest"]'  # CI tests only run on linux
       python-version: '["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]'

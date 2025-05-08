@@ -21,7 +21,7 @@ on:
 jobs:
   tests:
     name: Tests
-    uses: glenn20/python-ci/.github/workflows/ci-tox.yaml@main
+    uses: glenn20/python-ci/.github/workflows/ci-tox.yaml@dev
     with:
       os: '["ubuntu-latest"]'  # CI tests only run on linux
       python-version: '["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]'
@@ -46,7 +46,7 @@ jobs:
 
   github-release:
     name: Create GitHub release
-    uses: glenn20/python-ci/.github/workflows/release.yaml@v1
+    uses: glenn20/python-ci/.github/workflows/release.yaml@dev
     needs: publish-pypi
     permissions:
       contents: write  # IMPORTANT: mandatory for github release
