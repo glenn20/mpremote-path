@@ -5,7 +5,7 @@ import platform
 import shutil
 import subprocess
 import time
-from contextlib import suppress
+from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Generator
 
@@ -30,18 +30,6 @@ unix_micropython_boot = unix_dir / "boot.py"  # Initialisation script.
 default_port = "unix"
 
 logging.config.dictConfig(yaml.safe_load(logging_config.read_text()))
-
-# Install the socat package if running as a Github Action.
-print("Check environment variables for Github Actions.")
-print(os.environ)
-if os.getenv("GITHUB_ACTIONS"):
-    osname = platform.system()
-    print(f"Running on {osname!r} in Github Actions.")
-    if osname == "Linux":
-        print("Installing socat for Github Actions...")
-        subprocess.run("sudo apt-get install socat".split(), check=True)
-    else:
-        raise RuntimeError(f"Micropython unix port not supported on {osname}.")
 
 
 def pytest_addoption(parser: argparse.Namespace) -> None:
@@ -86,24 +74,32 @@ def rm_recursive(path: Path) -> None:
         pass
 
 
-@pytest.fixture(scope="session")
-def serial_port(
-    tmp_path_factory: pytest.TempPathFactory,
-    pytestconfig: argparse.Namespace,
-) -> Generator[str, None, None]:
-    """Create a serial port for the micropython board.
-    If the port is set to `unix`, create a unix port using socat."""
-    port = pytestconfig.option.port
-    if port != "unix":
-        yield port
-        return
-    wd = tmp_path_factory.mktemp("unix_micropython")
-    unix_pty = wd / "pty"
-    unix_fs = wd / "fs"
+# Install the socat package if running as a Github Action.
+def install_socat() -> None:
+    osname = platform.system()
+    print(f"Running on {osname!r} in Github Actions.")
+    if osname == "Linux":
+        print("Installing socat ubuntu package...")
+        subprocess.run("sudo apt-get install socat".split(), check=True)
+    else:
+        raise RuntimeError(f"Micropython unix port not supported on {osname}.")
+
+
+@contextmanager
+def run_micropython_port(working_dir: Path) -> Generator[str, None, None]:
+    """Run the micropython unix port using socat to emulate a serial port."""
+    # If we are running in Github Actions, install socat.
+    if os.getenv("GITHUB_ACTIONS"):
+        install_socat()
+
+    # Setup the working directories for running the unix port of micropython.
+    unix_pty = working_dir / "pty"  # This will be the PTY device.
+    unix_fs = working_dir / "fs"  # This will be the filesystem for micropython.
     unix_fs.mkdir()
-    # Copy the boot.py script to the filesystem directory
-    # This is used to initialise the RAM filesystem on the unix port.
-    shutil.copy(unix_micropython_boot, unix_fs)
+    shutil.copy(unix_micropython_boot, unix_fs)  # Copy boot.py to the fs directory
+
+    # Use socat to run the micropython unix port behind a PTY to emulate a
+    # serial port connection to an actual device.
     proc = subprocess.Popen(
         [
             "socat",
@@ -112,9 +108,27 @@ def serial_port(
         ],
         cwd=unix_fs,
     )
+    if proc.returncode:
+        raise RuntimeError("Failed to start socat process.")
     time.sleep(0.1)
-    yield str(unix_pty)
+    yield str(unix_pty)  # Return the path to the PTY as the serial port
     proc.terminate()
+
+
+@pytest.fixture(scope="session")
+def serial_port(
+    tmp_path_factory: pytest.TempPathFactory,
+    pytestconfig: argparse.Namespace,
+) -> Generator[str, None, None]:
+    """Create a serial port for the micropython board.
+    If the port is set to `unix`, run the unix port using socat."""
+    port = pytestconfig.option.port
+    if port != "unix":
+        yield port  # Return the serial port name as is
+    else:
+        wd = tmp_path_factory.mktemp("unix_micropython")
+        with run_micropython_port(wd) as port:
+            yield port  # Return the path to the PTY as the serial port
 
 
 @pytest.fixture(scope="session")
