@@ -89,7 +89,6 @@ env_list = [
     "3.9", "3.10", "3.11", "3.12", "3.13"
 ]
 labels = { static = ["clean", "typing", "lint", "format"], latest = ["3.13"] }
-dependency_groups = ["test"]
 env.clean.commands = [["coverage", "erase"]]  # Cleanup coverage data
 env.clean.skip_install = true
 env.typing.commands = [["mypy"]]
@@ -97,6 +96,7 @@ env.lint.commands = [["ruff", "check"]]
 env.format.commands = [["ruff", "format", "--check"]]
 env.3.13.commands = [["pytest", "--cov", {replace = "posargs", extend = true}]]
 env_run_base.commands = [["pytest", {replace = "posargs", extend = true}]]
+env_run_base.dependency_groups = ["test"]
 env_run_base.package = "editable"
 env_run_base.runner = "uv-venv-runner"
 env_run_base.passenv = ["GITHUB_ACTIONS"]
