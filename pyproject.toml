@@ -63,6 +63,7 @@ version.raw-options.git_describe_command = [
     "--match", "v*.[0-9][0-9][0-9]",
 ]
 
+# https://mypy.readthedocs.io/en/stable/config_file.html
 [tool.mypy]
 files = ["src", "tests"]
 exclude = "(^tests/_data.*$|^tests/unix-micropython/.*$)"
@@ -72,6 +73,7 @@ disallow_untyped_defs = true
 warn_return_any = true
 warn_unused_ignores = false
 
+# https://docs.astral.sh/ruff/configuration/
 [tool.ruff]
 exclude = ["_version.py", "tests/_data", "tests/unix-micropython"]
 lint.extend-select = ["I"]  # Enable ruffs isort rules (for compat with vscode ruff)
@@ -83,20 +85,28 @@ report.skip_covered = false
 append = true
 
 # https://tox.wiki/en/latest/config.html#pyproject-toml-native
-[tool.tox]  #
+[tool.tox]
 env_list = [
     "clean", "typing", "lint", "format",
     "3.9", "3.10", "3.11", "3.12", "3.13"
 ]
-labels = { static = ["clean", "typing", "lint", "format"], latest = ["3.13"] }
+labels = { static = ["clean", "typing", "lint", "format"] }
 env.clean.commands = [["coverage", "erase"]]  # Cleanup coverage data
 env.clean.skip_install = true
 env.typing.commands = [["mypy"]]
 env.lint.commands = [["ruff", "check"]]
 env.format.commands = [["ruff", "format", "--check"]]
-env.3.13.commands = [["pytest", "--cov", {replace = "posargs", extend = true}]]
-env_run_base.commands = [["pytest", {replace = "posargs", extend = true}]]
-env_run_base.dependency_groups = ["test"]
-env_run_base.package = "editable"
-env_run_base.runner = "uv-venv-runner"
-env_run_base.passenv = ["GITHUB_ACTIONS"]
+
+# Configure the pytest runs
+[tool.tox.env_run_base]
+commands = [["pytest", {replace = "posargs", extend = true}]]
+dependency_groups = ["test"]  # Everything we need to run the tox tests
+labels = ["test"]
+package = "editable"  # "editable" runs a bit faster then "wheel"
+runner = "uv-venv-runner"  # We love uv
+passenv = ["GITHUB_ACTIONS"]  # So conftest.py knows we are running in github actions
+
+[tool.tox.env.3.13]
+# Run coverage tests only on the latest python version
+commands = [["pytest", "--cov", {replace = "posargs", extend = true}]]
+labels = ["test", "coverage", "latest"]
