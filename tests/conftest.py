@@ -1,33 +1,26 @@
 import argparse
 import logging.config
 import os
-import platform
-import shutil
-import subprocess
-import time
-from contextlib import contextmanager, suppress
+from contextlib import suppress
 from pathlib import Path
 from typing import Generator
 
 import pytest
+import unix_port
 import yaml
 from mpremote.transport_serial import TransportError
 
 from mpremote_path import MPRemotePath as MPath
 
-board_test_dir = "/_tests"  # Directory to create for tests on the micropython board.
+# Set the default serial port for the micropython board to use the unix port.
+default_port = "unix"
+default_baud_rate = 2000000
 
 tests_dir = Path(__file__).parent  # Base directory for the tests.
 data_dir = tests_dir / "_data"  # Local directory containing test data files.
 logging_config = tests_dir / "logging.yaml"  # Logging configuration file.
 
-# Where to find the micropython unix port and the initialisation script.
-unix_dir = tests_dir / "unix-micropython"
-unix_micropython = unix_dir / "micropython -i -m boot"
-unix_micropython_boot = unix_dir / "boot.py"  # Initialisation script.
-
-# Set the default serial port for the micropython board to use the unix port.
-default_port = "unix"
+board_test_dir = "/_tests"  # Directory to create for tests on the micropython board.
 
 logging.config.dictConfig(yaml.safe_load(logging_config.read_text()))
 
@@ -45,8 +38,8 @@ def pytest_addoption(parser: argparse.Namespace) -> None:
         dest="baud",
         type=int,
         action="store",
-        default=921600,
-        help="Baud rate for serial port: 115200",
+        default=default_baud_rate,
+        help=f"Baud rate for serial port: {default_baud_rate}",
     )
     parser.addoption(
         "--sync",
@@ -74,47 +67,6 @@ def rm_recursive(path: Path) -> None:
         pass
 
 
-# Install the socat package if running as a Github Action.
-def install_socat() -> None:
-    osname = platform.system()
-    print(f"Running on {osname!r} in Github Actions.")
-    if osname == "Linux":
-        print("Installing socat ubuntu package...")
-        subprocess.run("sudo apt-get install socat".split(), check=True)
-    else:
-        raise RuntimeError(f"Micropython unix port not supported on {osname}.")
-
-
-@contextmanager
-def run_micropython_port(working_dir: Path) -> Generator[str, None, None]:
-    """Run the micropython unix port using socat to emulate a serial port."""
-    # If we are running in Github Actions, install socat.
-    if os.getenv("GITHUB_ACTIONS"):
-        install_socat()
-
-    # Setup the working directories for running the unix port of micropython.
-    unix_pty = working_dir / "pty"  # This will be the PTY device.
-    unix_fs = working_dir / "fs"  # This will be the filesystem for micropython.
-    unix_fs.mkdir()
-    shutil.copy(unix_micropython_boot, unix_fs)  # Copy boot.py to the fs directory
-
-    # Use socat to run the micropython unix port behind a PTY to emulate a
-    # serial port connection to an actual device.
-    proc = subprocess.Popen(
-        [
-            "socat",
-            f"PTY,link={unix_pty},rawer,b4000000",
-            f"EXEC:{unix_micropython},pty,stderr,onlcr=0,b4000000",
-        ],
-        cwd=unix_fs,
-    )
-    if proc.returncode:
-        raise RuntimeError("Failed to start socat process.")
-    time.sleep(0.1)
-    yield str(unix_pty)  # Return the path to the PTY as the serial port
-    proc.terminate()
-
-
 @pytest.fixture(scope="session")
 def serial_port(
     tmp_path_factory: pytest.TempPathFactory,
@@ -123,12 +75,13 @@ def serial_port(
     """Create a serial port for the micropython board.
     If the port is set to `unix`, run the unix port using socat."""
     port = pytestconfig.option.port
-    if port != "unix":
-        yield port  # Return the serial port name as is
-    else:
-        wd = tmp_path_factory.mktemp("unix_micropython")
-        with run_micropython_port(wd) as port:
+    if port == "unix":
+        with unix_port.run_micropython(
+            tmp_path_factory.mktemp("unix_micropython")
+        ) as port:
             yield port  # Return the path to the PTY as the serial port
+    else:
+        yield port  # Return the serial port name as is
 
 
 @pytest.fixture(scope="session")
