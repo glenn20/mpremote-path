@@ -74,22 +74,41 @@ def make_board(*args: Any, **kwargs: Any) -> Board:
 
 T = TypeVar("T", bound=Callable[..., Any])
 
+_starttime: float = time.time()
+_lastlogtime_ms: int = 0
+
 
 # Decorator to log args and return values of calls to methods of a class
 def logmethod(func: T, level: int = logging.DEBUG) -> T:
     def wrap(*args: Any, **kwargs: Any) -> Any:
+        global _lastlogtime_ms, _starttime
         if logger.getEffectiveLevel() < level:
             return func(*args, **kwargs)
-        cls, method = args[0], func.__name__
         arg_str = ", ".join(
             itertools.chain(
                 (repr(arg) for arg in args[1:]),
                 (f"{k}={v!r}" for k, v in kwargs.items()),
             )
         )
-        logger.log(level, f"{cls}.{method}({arg_str})")
+        cls = args[0]
+        method = func.__name__
+        msg = f"{cls}.{method}({arg_str})"
+        now_ms = int((time.time() - _starttime) * 1000)
+        delta_ms = now_ms - _lastlogtime_ms
+        logger.log(
+            level,
+            f"{msg:40s} at {now_ms:4d}ms ({delta_ms:+4d}ms)",
+        )
+        _lastlogtime_ms = now_ms
         result = func(*args, **kwargs)
-        logger.log(level, f"{cls}.{method}() returned: {result!r}")
+        now_ms = int((time.time() - _starttime) * 1000)
+        delta_ms = now_ms - _lastlogtime_ms
+        msg = f"{cls}.{method}() returned: {result!r}"
+        logger.log(
+            level,
+            f"{msg:50s} ({delta_ms:+4d}ms)",
+        )
+        _lastlogtime_ms = now_ms
         return result
 
     return cast(T, wrap)
@@ -165,7 +184,7 @@ class Board:
 
     @property
     def short_name(self) -> str:
-        return device_short_name(self._transport.device_name)
+        return device_short_name(self._transport.device_name).rsplit("/")[-1]
 
     def writer(self, data: bytes) -> None:
         """The writer function used by the mpremote SerialTransport instance."""
@@ -274,6 +293,7 @@ class Board:
             local_time = time.time()
             return board_time + offset - local_time
 
+    @logmethod
     def sync_clock(
         self,
         sync_time: time.struct_time | float | int | None = None,
@@ -293,6 +313,7 @@ class Board:
             f"if hasattr(machine, 'RTC'): machine.RTC().datetime({host_time})"
         )
 
+    @logmethod
     def check_clock(self, set_clock: bool = False, utc: bool = False) -> None:
         """Check the time on the board and save the epoch offset and clock
         offset between the host and the board (in seconds). Will sync the
