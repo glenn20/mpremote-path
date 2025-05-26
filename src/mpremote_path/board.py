@@ -200,6 +200,7 @@ class Board:
         `raw_repl`.
         """
         restore_repl = False
+        interrupted = False
         try:
             # We can nest raw_repl() managers - only enter raw repl if necessary
             if not self._transport.in_raw_repl:
@@ -210,6 +211,7 @@ class Board:
             # ctrl-C twice: interrupt any running program
             print("Interrupting command on board.")
             self._transport.serial.write(b"\r\x03\x03")
+            interrupted = True
             raise  # Re-raise the KeyboardInterrupt up to the top level
         except TransportError as exc:
             self.writer(f"TransportError: {message!r}\r\n".encode())
@@ -218,12 +220,14 @@ class Board:
                 self.writer(exc.args[2])
             else:  # Others just include a single message
                 self.writer(exc.args[0].encode())
+            interrupted = True
             raise
         finally:
             # Only exit the raw_repl if we entered it with this instance
             if restore_repl and self._transport.in_raw_repl:
                 self._transport.exit_raw_repl()
-                self._transport.read_until(4, b">>> ")
+                if not interrupted:
+                    self._transport.read_until(4, b">>> ")
 
     def soft_reset(self) -> None:
         """Perform a micropython soft reset of the board."""
