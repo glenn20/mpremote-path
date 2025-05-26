@@ -51,6 +51,16 @@ def pytest_addoption(parser: argparse.Namespace) -> None:
         action="store_true",
         help="Whether to use UTC for board clock: False",
     )
+    parser.addoption(
+        "--use-socat",
+        action="store_true",
+        help="Whether to use socat for PTY emulation: False",
+    )
+    parser.addoption(
+        "--debug-board",
+        action="store_true",
+        help="Whether to enable debug output: False",
+    )
 
 
 def rm_recursive(path: Path) -> None:
@@ -73,12 +83,19 @@ def serial_port(
     pytestconfig: argparse.Namespace,
 ) -> Generator[str, None, None]:
     """Create a serial port for the micropython board.
-    If the port is set to `unix`, run the unix port using socat."""
+    If the port is set to `unix`, run the unix port behind a PTY."""
     port = pytestconfig.option.port
+    use_socat = pytestconfig.option.use_socat
+    debug = logging.DEBUG if pytestconfig.option.debug_board else logging.INFO
+    logging.getLogger("mpremote_path").setLevel(debug)
+    logging.getLogger("unix_port").setLevel(debug)
+
     if port == "unix":
-        with unix_port.run_micropython(
-            tmp_path_factory.mktemp("unix_micropython")
-        ) as port:
+        # Run the micropython unix port behind a PTY to emulate a serial port.
+        # This is useful for testing connections to micropython without a
+        # real hardware device.
+        working_dir = tmp_path_factory.mktemp("unix_micropython")
+        with unix_port.run_micropython(working_dir, use_socat=use_socat) as port:
             yield port  # Return the path to the PTY as the serial port
     else:
         yield port  # Return the serial port name as is
@@ -96,11 +113,14 @@ def root(
         set_clock=pytestconfig.option.sync,
         utc=pytestconfig.option.utc,
     )
-    rm_recursive(MPath(board_test_dir))  # Clean up after previous test runs
-    path, pwd = MPath("/"), MPath.cwd()
-    path.chdir()
-    yield path
-    pwd.chdir()
+    # Optimisation: wrap everything in a raw_repl so we are not slowed down by
+    # entering and exiting the REPL for every command.
+    with MPath.board.raw_repl():
+        rm_recursive(MPath(board_test_dir))  # Clean up after previous test runs
+        path, pwd = MPath("/"), MPath.cwd()
+        path.chdir()
+        yield path
+        pwd.chdir()
 
 
 @pytest.fixture()

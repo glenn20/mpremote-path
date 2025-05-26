@@ -11,12 +11,15 @@ formatters:
 handlers:
   console:
     class: logging.StreamHandler
-    level: DEBUG
     formatter: default
     stream: ext://sys.stderr
 
 loggers:
   mpremote_path:
+    level: WARNING
+    handlers: [console]
+    propagate: no
+  unix_port:
     level: WARNING
     handlers: [console]
     propagate: no
