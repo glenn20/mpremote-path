@@ -119,9 +119,10 @@ class MPRemoteScanDir:
     def __init__(self, board: Board, path: str):
         #  Wrap all the file ops in a single raw repl
         with board.raw_repl():
-            files: tuple[tuple[str]] = (
+            files = cast(
+                tuple[tuple[str]],
                 board.exec_eval(f"for f in os.ilistdir('{path}'):print(f, end=',')")
-                or tuple()
+                or tuple(),
             )
             self.result = (MPRemoteDirEntry(board, path, *f) for f in files)
 
@@ -349,10 +350,10 @@ class MPRemotePath(Path, PurePosixPath):
         self._stat = stat
         return stat
 
-    def owner(self) -> str:
+    def owner(self, *, follow_symlinks: bool = False) -> str:
         return "root"
 
-    def group(self) -> str:
+    def group(self, *, follow_symlinks: bool = False) -> str:
         return "root"
 
     @overload
@@ -456,7 +457,12 @@ class MPRemotePath(Path, PurePosixPath):
         with self.board.raw_repl() as r:
             return r.fs_readfile(str(self))
 
-    def read_text(self, encoding: str | None = None, errors: str | None = None) -> str:
+    def read_text(
+        self,
+        encoding: str | None = None,
+        errors: str | None = None,
+        newline: str | None = None,
+    ) -> str:
         return self.read_bytes().decode(encoding or "utf-8", errors or "strict")
 
     def write_bytes(self, data: ReadableBuffer) -> int:
@@ -491,7 +497,16 @@ class MPRemotePath(Path, PurePosixPath):
     ) -> None:
         self._stat = None
         with self.board.raw_repl() as r:
-            r.fs_mkdir(str(self))
+            try:
+                r.fs_mkdir(str(self))
+            except FileExistsError:
+                if not exist_ok:
+                    raise
+            except FileNotFoundError:
+                if not parents:
+                    raise
+                self.parent.mkdir(parents=True, exist_ok=True)
+                r.fs_mkdir(str(self))
 
     def chmod(self, mode: int, *, follow_symlinks: bool = True) -> None:
         raise NotImplementedError
@@ -538,16 +553,20 @@ class MPRemotePath(Path, PurePosixPath):
 
     def exists(self, *, follow_symlinks: bool = False) -> bool:
         try:
-            self.stat()
+            self.stat(follow_symlinks=follow_symlinks)
         except FileNotFoundError:
             return False
         return True
 
-    def is_dir(self) -> bool:
-        return self.exists() and stat.S_ISDIR(self.stat().st_mode)
+    def is_dir(self, *, follow_symlinks: bool = False) -> bool:
+        return self.exists(follow_symlinks=follow_symlinks) and stat.S_ISDIR(
+            self.stat(follow_symlinks=follow_symlinks).st_mode
+        )
 
-    def is_file(self) -> bool:
-        return self.exists() and stat.S_ISREG(self.stat().st_mode)
+    def is_file(self, *, follow_symlinks: bool = False) -> bool:
+        return self.exists(follow_symlinks=follow_symlinks) and stat.S_ISREG(
+            self.stat(follow_symlinks=follow_symlinks).st_mode
+        )
 
     def is_mount(self) -> bool:
         return False

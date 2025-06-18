@@ -11,9 +11,7 @@ import logging
 import logging.config
 import os
 import pty
-import re
 import select
-import shutil
 import subprocess
 import sys
 import termios
@@ -21,34 +19,28 @@ import time
 from contextlib import contextmanager, suppress
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Generator
+from typing import Generator, Optional
 
 import yaml
-
-# Where to find the micropython unix port and the initialisation script.
-tests_dir = Path(__file__).parent  # Base directory for the tests.
-unix_dir = tests_dir / "unix-micropython"
-micropython = unix_dir / "micropython"
-micropython_command = str(micropython) + " -i -m boot"
-micropython_boot = unix_dir / "boot.py"  # Initialisation script.
 
 log = logging.getLogger(__name__)
 
 
 @contextmanager
-def run_micropython(
-    working_dir: Path,
+def run_pty_bridge(
+    command: str,
     /,
+    cwd: Optional[Path] = None,
     use_socat: bool = False,
-) -> Generator[str, None, None]:
-    """Run the micropython unix port behind a PTY to emulate a serial port.
+) -> Generator[Path, None, None]:
+    """Run the command behind a PTY to emulate a serial port.
 
-    Runs the micropython unix port and returns the name of a PTY to use as the
-    virtual serial port for communication with micropython. Input and output is
-    relayed between the PTY and micropython by a "bridge" process.
+    Runs the command and returns the name of a PTY to use as the virtual serial
+    port for communication with the command. Input and output is relayed between
+    the PTY and the command by a "bridge" process.
 
     The initial implementation used the `socat` program to create the PTY and
-    run the micropython unix port behind it.
+    run the command behind it.
 
     The default (and preferred) implementation uses a PTY bridge in pure python.
     This is more portable and does not require the socat program to be
@@ -57,14 +49,10 @@ def run_micropython(
     Supported platforms are Linux and MacOS. Windows is not supported.
     """
     # Setup the working directories for running the unix port of micropython.
-    unix_fs = working_dir / "fs"  # This will be the filesystem for micropython.
-    unix_fs.mkdir()
-    shutil.copy(micropython_boot, unix_fs)  # Copy boot.py to the fs directory
-
     # Run the micropython bridge process which starts the micropython unix port
     # behind a PTY.
-    micropython = micropython_bridge_socat if use_socat else micropython_bridge_pty
-    with micropython(micropython_command, working_dir) as pty:
+    pty_bridge = pty_bridge_socat if use_socat else pty_bridge_python
+    with pty_bridge(command, cwd=cwd) as pty:
         try:
             yield pty  # Return the name of the PTY as the serial port
         except KeyboardInterrupt:
@@ -76,45 +64,50 @@ def run_micropython(
 
 
 @contextmanager
-def micropython_bridge_socat(
-    command: str, working_dir: Path
-) -> Generator[str, None, None]:
+def pty_bridge_socat(
+    command: str, cwd: Optional[Path] = None
+) -> Generator[Path, None, None]:
     # Use socat to run the micropython unix port behind a PTY to emulate a
     # serial port connection to an actual device.
-    unix_pty = working_dir / "pty"
-    proc = subprocess.Popen(
-        [
-            "socat",
-            f"PTY,link={unix_pty},rawer",
-            f"EXEC:{command},pty,stderr,onlcr=0",
-        ],
-        cwd=working_dir / "fs",
-    )
-    if proc.returncode:
-        raise RuntimeError("Failed to start socat process.")
-    time.sleep(0.1)
-    try:
-        yield str(unix_pty)  # Return the path to the PTY as the serial port
-    finally:
-        proc.terminate()
+    with TemporaryDirectory(prefix="micropython") as temp_dir:
+        symlink_to_pty = Path(temp_dir) / "pty"  # Symlink to the PTY
+        proc = subprocess.Popen(
+            [
+                "socat",
+                f"PTY,link={symlink_to_pty},rawer",
+                f"EXEC:{command},pty,stderr,onlcr=0",
+            ],
+            cwd=cwd,
+        )
+        if proc.returncode:
+            raise RuntimeError("Failed to start socat process.")
+        for _ in range(50):
+            if os.path.exists(symlink_to_pty):
+                break
+            time.sleep(0.02)  # Need a slight pause to ensure the PTY is ready
+        try:
+            yield symlink_to_pty  # Return the path to the PTY as the serial port
+        finally:
+            proc.terminate()
 
 
 ### The preferred implementation using a PTY bridge in pure python
 
 
 @contextmanager
-def micropython_bridge_pty(command: str, cwd: Path) -> Generator[str, None, None]:
-    """Run the micropython unix port using a PTY to emulate a serial port.
-    Returns the name of the slave end of a PTY pair. The PTY emulates a serial
-    port for communicating with a running instance of the micropython unix port.
-    The "bridge" process runs the micropython unix port and relays data between
-    the "serial port" PTY and the micropython process.
+def pty_bridge_python(
+    command: str, cwd: Optional[Path] = None
+) -> Generator[Path, None, None]:
+    """Run the command using a PTY to emulate a serial port.
+    Returns a symlink to the slave end of a PTY pair. The PTY emulates a serial
+    port for communicating with a running instance of the command. The "bridge"
+    process runs the command and relays data between the "serial port" PTY and
+    the command process.
     """
-    os.chdir(cwd)  # Change to the working directory
     # Create a new PTY master-slave pair.
     bridge_pty, serial_port_pty = pty.openpty()  # Open the new PTY
     pty_set_rawer(serial_port_pty)  # Emulate the `rawer` option of socat
-    serial_port_name = os.ttyname(serial_port_pty)  # Get the name of the PTY
+    serial_port_path = Path(os.ttyname(serial_port_pty))
     os.close(serial_port_pty)
 
     # Start the bridge process which will run the micropython unix port.
@@ -122,28 +115,29 @@ def micropython_bridge_pty(command: str, cwd: Path) -> Generator[str, None, None
     if bridge_pid == 0:
         # Child process - the Bridge process
         log.debug(
-            f"Bridge process: pid={os.getpid()}, pty={bridge_pty} ({serial_port_name})."
+            f"Bridge process: pid={os.getpid()}, pty={bridge_pty} ({serial_port_path})."
         )
-        os.chdir(cwd / "fs")  # Change to the micropython fs directory
+        if cwd:
+            os.chdir(cwd)
         # Run micropython and forward data to/from `serial_port_name`.
-        run_micropython_subprocess(command, bridge_pty)
+        run_pty_bridge_process(command, bridge_pty)
         log.debug("Bridge process: Exiting.")
         sys.exit()  # Exit the subprocesses.
 
     # Parent process - the main process
     try:
-        yield serial_port_name  # Return the name of the PTY as the serial port
+        yield serial_port_path  # Return path of the PTY as the serial port
     finally:
         # Close the PTY and wait for the bridge process to finish.
         close_pty_subprocess(bridge_pty, bridge_pid)
 
 
-def run_micropython_subprocess(command: str, bridge_pty: int) -> None:
-    """Start the micropython unix port subprocess attached to a PTY.
+def run_pty_bridge_process(command: str, bridge_pty: int) -> None:
+    """Start the command subprocess attached to a PTY.
     Return the child PID and file descriptor of the PTY."""
     argv = command.split()
     micropython_path = Path(argv[0]).resolve()
-    argv = [argv[0].rsplit("/")[-1]] + argv[1:]  # Use abbreviated command name
+    argv = [micropython_path.name] + argv[1:]  # Use abbreviated command name
 
     micropython_pid, micropython_pty = pty.fork()
     if micropython_pid == 0:
@@ -161,6 +155,14 @@ def run_micropython_subprocess(command: str, bridge_pty: int) -> None:
         log.debug("Keyboard interrupt received in bridge process.")
     finally:
         close_pty_subprocess(micropython_pty, micropython_pid)
+
+
+def pty_set_micropython(fd: int) -> None:
+    """Initialise the PTY for use by micropython.
+    This fixes up the CR/NL translation for compatibility with mpremote and others."""
+    tc = termios.tcgetattr(fd)
+    tc[1] &= ~termios.ONLCR  # Disable CR/NL translation
+    termios.tcsetattr(fd, termios.TCSAFLUSH, tc)
 
 
 def pty_relay(bridge_pty: int, micropython_pty: int) -> int:
@@ -216,14 +218,6 @@ def close_pty_subprocess(pty_fd: int, child_pid: int) -> None:
         os.waitpid(child_pid, 0)  # Wait for the child to finish
 
 
-def pty_set_micropython(fd: int) -> None:
-    """Initialise the PTY for use by micropython.
-    This fixes up the CR/NL translation for compatibility with mpremote and others."""
-    tc = termios.tcgetattr(fd)
-    tc[1] &= ~termios.ONLCR  # Disable CR/NL translation
-    termios.tcsetattr(fd, termios.TCSAFLUSH, tc)
-
-
 def pty_set_rawer(fd: int) -> None:
     """Initialise the PTY for use as the emulated serial port.
     Sets the PTY to `rawer` mode (this is the same as the mode used by socat)."""
@@ -238,36 +232,61 @@ def pty_set_rawer(fd: int) -> None:
     termios.tcsetattr(fd, termios.TCSAFLUSH, tc)  # Set the attributes for the PTY
 
 
-# Find a valid baud rate for the given baud rate.
-def get_baud_rate(requested_baud: int) -> tuple[int, int]:
-    """Find the highest baud rate <= requested_baud from the available baud
-    rates. Returns a tuple of (baud_rate, termios_value) where baud_rate is the
-    baud rate in bits per second and termios_value is the value to be passed to
-    the tcsetattr() function."""
-    available_baud_rates: Generator[tuple[int, int], None, None] = (
-        # Baud rates are defined as B<rate> in the termios module.
-        (int(k[1:]), v)
-        for k, v in termios.__dict__.items()
-        if re.match(r"B[0-9]+$", k)
-    )
-    return max(
-        available_baud_rates,
-        key=lambda x: x[0] if x[0] <= requested_baud else 0,
-    )
-
-
 def main() -> None:
-    logging_config = tests_dir / "logging.yaml"  # Logging configuration file.
+    import argparse
 
+    parser = argparse.ArgumentParser(description="Run the micropython unix port tests.")
+    parser.add_argument(
+        "-c",
+        "--command",
+        type=str,
+        help="Command to run the micropython unix port.",
+    )
+    parser.add_argument(
+        "-C",
+        "--cwd",
+        type=Path,
+        help="Working directory to run the micropython unix port.",
+    )
+    parser.add_argument(
+        "-l",
+        "--link",
+        type=Path,
+        help="Name of the link to PTY connected to the running micropython.",
+    )
+    parser.add_argument(
+        "--use-socat",
+        action="store_true",
+        help="Use socat to run the micropython unix port behind a PTY.",
+    )
+    args = parser.parse_args()
+
+    command: str = args.command
+    cwd: Optional[Path] = args.cwd
+    link: Optional[Path] = args.link
+    use_socat: bool = args.use_socat
+
+    # Where to find the micropython unix port and the initialisation script.
+    tests_dir = Path(__file__).parent  # Base directory for the tests.
+    unix_dir = tests_dir / "unix-micropython"
+    micropython_path = unix_dir / "micropython"
+
+    if not command:
+        command = str(micropython_path) + " -i -m boot"
+
+    logging_config = tests_dir / "logging.yaml"  # Logging configuration file.
     logging.config.dictConfig(yaml.safe_load(logging_config.read_text()))
 
-    with TemporaryDirectory() as working_dir:
-        try:
-            with run_micropython(Path(working_dir), use_socat=False) as pty:
-                print(f"Running micropython on {pty}...")
-                os.waitpid(-1, 0)  # Wait for the child process to finish
-        except KeyboardInterrupt:
-            log.debug("Keyboard interrupt received in main process, exiting...")
+    try:
+        with run_pty_bridge(command, cwd=cwd, use_socat=use_socat) as pty:
+            if link:
+                link.symlink_to(pty)  # Create a symlink to the PTY for easier access
+                print(f"{link} -> {pty}")
+            else:
+                print(pty)
+            os.waitpid(-1, 0)  # Wait for the child process to finish
+    except KeyboardInterrupt:
+        log.debug("Keyboard interrupt received in main process, exiting...")
 
 
 if __name__ == "__main__":

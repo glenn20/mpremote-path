@@ -47,7 +47,6 @@ requires = ["hatchling>=1.24", "hatch-vcs>=0.3"]
 build-backend = "hatchling.build"
 
 [tool.hatch]
-build.targets.wheel.packages = ["src/mpremote_path"]
 build.hooks.vcs.version-file = "src/mpremote_path/_version.py"
 version.source = "vcs"  # Get the version from git, eg: 0.0.6.dev0+g1234567
 # Drop the local version part (eg: +g1234567) or pypi will reject package
@@ -90,7 +89,7 @@ env_list = [
     "clean", "typing", "lint", "format",
     "3.9", "3.10", "3.11", "3.12", "3.13"
 ]
-labels = { static = ["clean", "typing", "lint", "format"] }
+labels.static = ["clean", "typing", "lint", "format"]
 env.clean.commands = [["coverage", "erase"]]  # Cleanup coverage data
 env.clean.skip_install = true
 env.typing.commands = [["mypy"]]

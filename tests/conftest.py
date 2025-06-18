@@ -1,6 +1,7 @@
 import argparse
 import logging.config
 import os
+import shutil
 from contextlib import suppress
 from pathlib import Path
 from typing import Generator
@@ -94,9 +95,21 @@ def serial_port(
         # Run the micropython unix port behind a PTY to emulate a serial port.
         # This is useful for testing connections to micropython without a
         # real hardware device.
+        # Where to find the micropython unix port and the initialisation script.
+        tests_dir = Path(__file__).parent  # Base directory for the tests.
+        unix_dir = tests_dir / "unix-micropython"
+        micropython_path = unix_dir / "micropython"
+        command = str(micropython_path) + " -i -m boot"
+
         working_dir = tmp_path_factory.mktemp("unix_micropython")
-        with unix_port.run_micropython(working_dir, use_socat=use_socat) as port:
-            yield port  # Return the path to the PTY as the serial port
+        unix_fs = working_dir / "fs"
+        unix_fs.mkdir()  # Create the filesystem directory
+        shutil.copy(unix_dir / "boot.py", unix_fs)  # Copy boot.py to the fs
+
+        with unix_port.run_pty_bridge(
+            command, cwd=unix_fs, use_socat=use_socat
+        ) as port:
+            yield str(port)  # Return the path to the PTY as the serial port
     else:
         yield port  # Return the serial port name as is
 
