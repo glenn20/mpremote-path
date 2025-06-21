@@ -15,7 +15,7 @@ from mpremote_path import MPRemotePath as MPath
 
 # Set the default serial port for the micropython board to use the unix port.
 default_port = "unix"
-default_baud_rate = 2000000
+default_baud_rate = 115200
 
 tests_dir = Path(__file__).parent  # Base directory for the tests.
 data_dir = tests_dir / "_data"  # Local directory containing test data files.
