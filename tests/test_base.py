@@ -49,6 +49,28 @@ def test_mkdir(testdir: MPath) -> None:
     assert p.exists() is False
 
 
+def test_mkdir_parents(testdir: MPath) -> None:
+    "Test creating and deleting directories with parents"
+    p = testdir / "a" / "b" / "c"
+    assert p.exists() is False
+    with pytest.raises(FileNotFoundError):
+        p.mkdir(parents=False)
+    assert p.exists() is False
+    p.mkdir(parents=True)
+    assert p.is_dir() is True
+    p.rmdir()
+    assert p.exists() is False
+    assert p.parent.is_dir() is True
+    p.parent.rmdir()
+    assert p.parent.exists() is False
+    assert p.parent.parent.is_dir() is True
+    p.parent.parent.rmdir()
+    assert p.parent.parent.exists() is False
+    assert p.parent.parent.parent.is_dir() is True
+    p.parent.parent.parent.rmdir()
+    assert p.parent.parent.parent.exists() is False
+
+
 def test_cd(testdir: MPath) -> None:
     "Test changing directories"
     p = testdir
