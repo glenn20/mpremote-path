@@ -228,6 +228,7 @@ class Board:
                 self._transport.exit_raw_repl()
                 if not interrupted:
                     self._transport.read_until(4, b">>> ")
+                    self.writer(b">>> ")
 
     def soft_reset(self) -> None:
         """Perform a micropython soft reset of the board."""
