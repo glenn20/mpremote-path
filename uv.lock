@@ -491,14 +491,14 @@ wheels = [
 
 [[package]]
 name = "jaraco-functools"
-version = "4.1.0"
+version = "4.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "more-itertools" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ab/23/9894b3df5d0a6eb44611c36aec777823fc2e07740dabbd0b810e19594013/jaraco_functools-4.1.0.tar.gz", hash = "sha256:70f7e0e2ae076498e212562325e805204fc092d7b4c17e0e86c959e249701a9d", size = 19159, upload-time = "2024-09-27T19:47:09.122Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/49/1c/831faaaa0f090b711c355c6d8b2abf277c72133aab472b6932b03322294c/jaraco_functools-4.2.1.tar.gz", hash = "sha256:be634abfccabce56fa3053f8c7ebe37b682683a4ee7793670ced17bab0087353", size = 19661, upload-time = "2025-06-21T19:22:03.201Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9f/4f/24b319316142c44283d7540e76c7b5a6dbd5db623abd86bb7b3491c21018/jaraco.functools-4.1.0-py3-none-any.whl", hash = "sha256:ad159f13428bc4acbf5541ad6dec511f91573b90fba04df61dafa2a1231cf649", size = 10187, upload-time = "2024-09-27T19:47:07.14Z" },
+    { url = "https://files.pythonhosted.org/packages/f3/fd/179a20f832824514df39a90bb0e5372b314fea99f217f5ab942b10a8a4e8/jaraco_functools-4.2.1-py3-none-any.whl", hash = "sha256:590486285803805f4b1f99c60ca9e94ed348d4added84b74c7a12885561e524e", size = 10349, upload-time = "2025-06-21T19:22:02.039Z" },
 ]
 
 [[package]]
@@ -817,11 +817,11 @@ wheels = [
 
 [[package]]
 name = "pygments"
-version = "2.19.1"
+version = "2.19.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/7c/2d/c3338d48ea6cc0feb8446d8e6937e1408088a72a39937982cc6111d17f84/pygments-2.19.1.tar.gz", hash = "sha256:61c16d2a8576dc0649d9f39e089b5f02bcd27fba10d8fb4dcc28173f7a45151f", size = 4968581, upload-time = "2025-01-06T17:26:30.443Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b0/77/a5b8c569bf593b0140bde72ea885a803b82086995367bf2037de0159d924/pygments-2.19.2.tar.gz", hash = "sha256:636cb2477cec7f8952536970bc533bc43743542f70392ae026374600add5b887", size = 4968631, upload-time = "2025-06-21T13:39:12.283Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8a/0b/9fcc47d19c48b59121088dd6da2488a49d5f72dacf8262e2790a1d2c7d15/pygments-2.19.1-py3-none-any.whl", hash = "sha256:9ea1544ad55cecf4b8242fab6dd35a93bbce657034b0611ee383099054ab6d8c", size = 1225293, upload-time = "2025-01-06T17:26:25.553Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/21/705964c7812476f378728bdf590ca4b771ec72385c533964653c68e86bdc/pygments-2.19.2-py3-none-any.whl", hash = "sha256:86540386c03d588bb81d44bc3928634ff26449851e99741617ecb9037ee5ec0b", size = 1225217, upload-time = "2025-06-21T13:39:07.939Z" },
 ]
 
 [[package]]

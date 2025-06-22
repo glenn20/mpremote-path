@@ -1,15 +1,12 @@
 import argparse
 import logging.config
 import os
-import shutil
-from contextlib import suppress
 from pathlib import Path
 from typing import Generator
 
 import pytest
 import unix_port
 import yaml
-from mpremote.transport_serial import TransportError
 
 from mpremote_path import MPRemotePath as MPath
 
@@ -17,11 +14,13 @@ from mpremote_path import MPRemotePath as MPath
 default_port = "unix"
 default_baud_rate = 115200
 
+# Location of the tests and data directories on the local filesystem.
 tests_dir = Path(__file__).parent  # Base directory for the tests.
 data_dir = tests_dir / "_data"  # Local directory containing test data files.
 logging_config = tests_dir / "logging.yaml"  # Logging configuration file.
 
-board_test_dir = "/_tests"  # Directory to create for tests on the micropython board.
+# Directory to create for tests on the micropython board.
+board_test_dir = "_mpremote_path_tests"
 
 logging.config.dictConfig(yaml.safe_load(logging_config.read_text()))
 
@@ -64,6 +63,7 @@ def pytest_addoption(parser: argparse.Namespace) -> None:
     )
 
 
+# TODO: Make this a function on the board.
 def rm_recursive(path: Path) -> None:
     """Remove a directory and all it's contents recursively."""
     if path.is_file():
@@ -99,12 +99,12 @@ def serial_port(
         tests_dir = Path(__file__).parent  # Base directory for the tests.
         unix_dir = tests_dir / "unix-micropython"
         micropython_path = unix_dir / "micropython"
-        command = str(micropython_path) + " -i -m boot"
+        command = str(micropython_path) + ""  # " -i -m boot"
 
         working_dir = tmp_path_factory.mktemp("unix_micropython")
         unix_fs = working_dir / "fs"
         unix_fs.mkdir()  # Create the filesystem directory
-        shutil.copy(unix_dir / "boot.py", unix_fs)  # Copy boot.py to the fs
+        # shutil.copy(unix_dir / "boot.py", unix_fs)  # Copy boot.py to the fs
 
         with unix_port.run_pty_bridge(
             command, cwd=unix_fs, use_socat=use_socat
@@ -130,36 +130,37 @@ def root(
     # entering and exiting the REPL for every command.
     with MPath.board.raw_repl():
         rm_recursive(MPath(board_test_dir))  # Clean up after previous test runs
-        path, pwd = MPath("/"), MPath.cwd()
-        path.chdir()
-        yield path
-        pwd.chdir()
+        cwd = MPath.cwd()
+        try:
+            yield cwd
+        finally:
+            cwd.chdir()
+    MPath.disconnect()  # Disconnect from the board
 
 
 @pytest.fixture()
 def testdir(root: MPath) -> Generator[MPath, None, None]:
     path, pwd = MPath(board_test_dir), MPath.cwd()
-    yield path
-    if pwd:  # Restore the previous working directory and cleanup
+    try:
+        yield path
+    finally:
         pwd.chdir()
 
 
 @pytest.fixture()
 def testfolder(root: MPath) -> Generator[MPath, None, None]:
     "Create a test folder on the board and cd into it."
-    path, pwd = MPath(board_test_dir), MPath.cwd()
-    if path in (pwd, *pwd.parents):
-        MPath("/").chdir()
+    pwd, path = MPath("~").expanduser(), MPath(board_test_dir)
+    pwd.chdir()
     rm_recursive(path)
-    with suppress(TransportError, OSError):
-        path.mkdir()
+    path = path.resolve()
+    path.mkdir()
     path.chdir()
     try:
         yield path
     finally:
         pwd.chdir()
-    with suppress(TransportError, OSError):
-        rm_recursive(path)
+    # rm_recursive(path)
 
 
 @pytest.fixture()

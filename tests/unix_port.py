@@ -122,7 +122,7 @@ def pty_bridge_python(
         # Run micropython and forward data to/from `serial_port_name`.
         run_pty_bridge_process(command, bridge_pty)
         log.debug("Bridge process: Exiting.")
-        sys.exit()  # Exit the subprocesses.
+        os._exit(0)  # Exit the subprocesses.
 
     # Parent process - the main process
     try:

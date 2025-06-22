@@ -19,7 +19,7 @@ from mpremote_path import MPRemotePath as MPath
 
 def test_root_folder(root: MPath) -> None:
     """Test the RemotePath class."""
-    p = MPath("/")
+    p = root
     assert p.exists() is True
     assert len(list(p.stat())) == 10
     assert stat.S_ISDIR(p.stat().st_mode) is True
@@ -31,10 +31,10 @@ def test_root_folder(root: MPath) -> None:
     assert p.is_char_device() is False
     assert p.is_fifo() is False
     assert p.is_socket() is False
-    assert p.cwd().as_posix() == "/"
-    assert p.home().as_posix() == "/"
-    assert MPath("~").expanduser().as_posix() == "/"
-    assert MPath("~/boot.py").expanduser().as_posix() == "/boot.py"
+    assert MPath.cwd().as_posix() == p.as_posix()
+    assert p.home().as_posix() == p.as_posix()
+    assert MPath("~").expanduser().as_posix() == p.as_posix()
+    assert MPath("~/boot.py").expanduser().as_posix() == (p / "boot.py").as_posix()
 
 
 def test_mkdir(testdir: MPath) -> None:
@@ -74,13 +74,14 @@ def test_mkdir_parents(testdir: MPath) -> None:
 def test_cd(testdir: MPath) -> None:
     "Test changing directories"
     p = testdir
+    resolved = p.resolve()
     assert p.exists() is False
     p.mkdir()
     assert p.exists() is True
     p.chdir()
-    assert p.cwd().as_posix() == testdir.as_posix()
-    MPath("/").chdir()
-    assert p.cwd().as_posix() == "/"
+    assert p.cwd().as_posix() == resolved.as_posix()
+    MPath("~").expanduser().chdir()
+    assert MPath.cwd().as_posix() == p.parent.resolve().as_posix()
     p.rmdir()
     assert p.exists() is False
 
@@ -142,11 +143,16 @@ def test_read_write_text(testfolder: MPath) -> None:
 
 def test_resolve_samefile(root: MPath) -> None:
     "Test resolving paths: absolute(), and resolve()"
-    q = MPath("./lib/mpy")
-    q = q / "../.././main.py"
+    q = MPath("./lib/mpy") / "../.././main.py"
     assert q.as_posix() == "lib/mpy/../../main.py"
-    assert q.absolute().as_posix() == "/lib/mpy/../../main.py"
-    assert q.absolute().resolve().as_posix() == "/main.py"
+    assert (
+        q.absolute().as_posix()
+        == MPath("~").expanduser().as_posix().rstrip("/") + "/lib/mpy/../../main.py"
+    )
+    assert (
+        q.absolute().resolve().as_posix()
+        == MPath("~").expanduser().as_posix().rstrip("/") + "/main.py"
+    )
     assert q.samefile(q.absolute()) is True
     assert q.samefile(q.absolute().resolve()) is True
 
@@ -161,7 +167,7 @@ def test_copy_copyfile(testfolder: MPath) -> None:
     q = p.copyfile("test2.touch")
     assert q.read_text() == msg
     q.unlink()
-    d1 = testfolder / "dir1"
+    d1 = MPath("dir1")
     d1.mkdir()
     q = p.copy(d1)
     assert str(q) == str(d1 / "test1.touch")
