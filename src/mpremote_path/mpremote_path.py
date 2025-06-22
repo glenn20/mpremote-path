@@ -203,6 +203,7 @@ class MPRemotePath(Path, PurePosixPath):
     _drv: str  # Declare types for properties inherited from pathlib classes
     _root: str
     _parts: list[str]
+    _home_dir: str = ""  # Home directory on the board, set by connect()
 
     if sys.version_info >= (3, 13):
         _globber = _MPRemoteGlobber
@@ -260,6 +261,10 @@ class MPRemotePath(Path, PurePosixPath):
         )  # fmt: skip
         cls.board.check_clock(set_clock, utc)
         cls.board.exec("import os")
+        # Set the home directory to the initial working directory on the board.
+        # On devices, this will be the root directory.
+        # On the micropython unix port it will be dir where the script is run.
+        cls._home_dir = cls.board.eval_str("os.getcwd()")
 
     @classmethod
     def disconnect(cls) -> None:
@@ -270,7 +275,7 @@ class MPRemotePath(Path, PurePosixPath):
     def chdir(self) -> MPRemotePath:
         "Set the current working directory on the board to this path."
         p = self.resolve()
-        self.board.exec(f"os.chdir('{p}')")
+        self.board.exec(f"os.chdir('{p.as_posix()}')")
         return p
 
     def copyfile(self, target: MPRemotePath | str) -> MPRemotePath:
@@ -294,7 +299,7 @@ class MPRemotePath(Path, PurePosixPath):
     # Overrides for pathlib.Path methods
     @classmethod
     def home(cls) -> MPRemotePath:
-        return cls("/")
+        return cls(cls._home_dir)
 
     # Path.glob(), Path.rglob(), Path.walk() and Path.iterdir() rely on _scandir()
     def _scandir(self) -> MPRemoteScanDir:
@@ -588,4 +593,4 @@ class MPRemotePath(Path, PurePosixPath):
 
     def expanduser(self) -> MPRemotePath:
         first, rest = self.parts[:1], self.parts[1:]
-        return self.with_segments("/", *rest) if first == ("~",) else self
+        return self.with_segments(self._home_dir, *rest) if first == ("~",) else self
