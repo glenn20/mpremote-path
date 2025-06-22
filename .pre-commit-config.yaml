@@ -18,6 +18,7 @@ repos:
       description: >-
         This hook runs all static checks, including mypy, and ruff.
         It is recommended to run this on pre-commit and pre-push.
+        Will also sync and update the uv.lock file before commit.
       always_run: true
       language: python
       entry: uv run tox -m static

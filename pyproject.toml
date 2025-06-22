@@ -23,18 +23,18 @@ classifiers = [
 requires-python = ">=3.9"
 dynamic = ["version"]
 dependencies = [
-    "mpremote >= 1.20.0, != 1.24.0",
+    "mpremote >= 1.20, != 1.24.0",
 ]
 
 [project.scripts]
 mpfs = "mpremote_path.util.mpfs:main"
 
 [dependency-groups]
-typing = ["mypy>=0.910", "types-pyserial>=3.5", "types-pyyaml>=6.0.0"]
+typing = ["mypy>=0.910", "types-pyserial>=3.5", "types-pyyaml>=6.0"]
 test = [
     {include-group = "typing"},
-    "ruff>=0.6.7", "pytest>=8.3.2", "pytest-cov>=3.0.0",
-    "pyyaml>=6.0.0", "tox>=4.22", "tox-uv>=1.13",
+    "ruff>=0.6", "pytest>=8.3", "pytest-cov>=3.0",
+    "pyyaml>=6.0", "tox>=4.22", "tox-uv>=1.13", "tox_gh>=1.5"
 ]
 dev = [
     {include-group = "test"},
@@ -82,6 +82,14 @@ run.source = ["src", "tests"]
 run.omit = ["_version.py"]
 report.skip_covered = false
 append = true
+
+[tool.tox.gh.python]  # For Github Actions workflow - see
+"3.13" = ["clean", "typing", "lint", "format", "3.13"]
+"3.12" = ["3.12"]
+"3.11" = ["3.11"]
+"3.10" = ["3.10"]
+"3.9"  = ["3.9"]
+"3.8"  = ["3.8"]
 
 # https://tox.wiki/en/latest/config.html#pyproject-toml-native
 [tool.tox]

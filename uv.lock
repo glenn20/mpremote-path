@@ -590,6 +590,7 @@ dev = [
     { name = "pyyaml" },
     { name = "ruff" },
     { name = "tox" },
+    { name = "tox-gh" },
     { name = "tox-uv" },
     { name = "types-pyserial" },
     { name = "types-pyyaml" },
@@ -601,6 +602,7 @@ test = [
     { name = "pyyaml" },
     { name = "ruff" },
     { name = "tox" },
+    { name = "tox-gh" },
     { name = "tox-uv" },
     { name = "types-pyserial" },
     { name = "types-pyyaml" },
@@ -612,7 +614,7 @@ typing = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "mpremote", specifier = ">=1.20.0,!=1.24.0" }]
+requires-dist = [{ name = "mpremote", specifier = ">=1.20,!=1.24.0" }]
 
 [package.metadata.requires-dev]
 dev = [
@@ -622,30 +624,32 @@ dev = [
     { name = "pip", specifier = ">=23.0.1" },
     { name = "pre-commit", specifier = ">=2.9.2" },
     { name = "pre-commit-uv", specifier = ">=4.0" },
-    { name = "pytest", specifier = ">=8.3.2" },
-    { name = "pytest-cov", specifier = ">=3.0.0" },
-    { name = "pyyaml", specifier = ">=6.0.0" },
-    { name = "ruff", specifier = ">=0.6.7" },
+    { name = "pytest", specifier = ">=8.3" },
+    { name = "pytest-cov", specifier = ">=3.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "ruff", specifier = ">=0.6" },
     { name = "tox", specifier = ">=4.22" },
+    { name = "tox-gh", specifier = ">=1.5" },
     { name = "tox-uv", specifier = ">=1.13" },
     { name = "types-pyserial", specifier = ">=3.5" },
-    { name = "types-pyyaml", specifier = ">=6.0.0" },
+    { name = "types-pyyaml", specifier = ">=6.0" },
 ]
 test = [
     { name = "mypy", specifier = ">=0.910" },
-    { name = "pytest", specifier = ">=8.3.2" },
-    { name = "pytest-cov", specifier = ">=3.0.0" },
-    { name = "pyyaml", specifier = ">=6.0.0" },
-    { name = "ruff", specifier = ">=0.6.7" },
+    { name = "pytest", specifier = ">=8.3" },
+    { name = "pytest-cov", specifier = ">=3.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "ruff", specifier = ">=0.6" },
     { name = "tox", specifier = ">=4.22" },
+    { name = "tox-gh", specifier = ">=1.5" },
     { name = "tox-uv", specifier = ">=1.13" },
     { name = "types-pyserial", specifier = ">=3.5" },
-    { name = "types-pyyaml", specifier = ">=6.0.0" },
+    { name = "types-pyyaml", specifier = ">=6.0" },
 ]
 typing = [
     { name = "mypy", specifier = ">=0.910" },
     { name = "types-pyserial", specifier = ">=3.5" },
-    { name = "types-pyyaml", specifier = ">=6.0.0" },
+    { name = "types-pyyaml", specifier = ">=6.0" },
 ]
 
 [[package]]
@@ -1112,6 +1116,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a5/b7/19c01717747076f63c54d871ada081cd711a7c9a7572f2225675c3858b94/tox-4.27.0.tar.gz", hash = "sha256:b97d5ecc0c0d5755bcc5348387fef793e1bfa68eb33746412f4c60881d7f5f57", size = 198351, upload-time = "2025-06-17T15:17:50.585Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c1/3a/30889167f41ecaffb957ec4409e1cbc1d5d558a5bbbdfb734a5b9911930f/tox-4.27.0-py3-none-any.whl", hash = "sha256:2b8a7fb986b82aa2c830c0615082a490d134e0626dbc9189986da46a313c4f20", size = 173441, upload-time = "2025-06-17T15:17:48.689Z" },
+]
+
+[[package]]
+name = "tox-gh"
+version = "1.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "tox" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4e/0e/6facd007d6f2d0358c133ab3fdcd49a6692470c345f94c482206e0efbdbd/tox_gh-1.5.0.tar.gz", hash = "sha256:bd4c56d1ebcde4ca2450fed347610a739614a7225945bdc89a67c8395eac9d63", size = 7741, upload-time = "2025-01-16T00:46:12.095Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/13/62/db91eff00205846878e0184d4ba5b24e35cf5540e16b77ea8e5644206dff/tox_gh-1.5.0-py3-none-any.whl", hash = "sha256:fd7e8c826f4576a02af4737fd4b738817660b63898c161d6ee8f658c885f7fa1", size = 6844, upload-time = "2025-01-16T00:46:09.499Z" },
 ]
 
 [[package]]
