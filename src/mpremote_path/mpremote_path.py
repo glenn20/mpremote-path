@@ -104,7 +104,7 @@ class MPRemoteDirEntry:
         return stat.S_ISLNK(self._stat.st_mode)
 
     def stat(self, *, follow_symlinks: bool = True) -> os.stat_result:
-        if self._stat.st_mode == 0:  # Get the full os.stat() result
+        if self._stat.st_size == 0:  # Get the full os.stat() result
             self._stat = self._board.fs_stat(self.path)
             if self._stat.st_mtime == 0:  # Fetch the mtime from the board
                 mtime = self._board.eval(f"os.stat({self.path!r})[8]")
