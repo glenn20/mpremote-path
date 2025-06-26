@@ -14,14 +14,14 @@ name: Publish and Release
 #   repository.
 
 on:
-  push:
-    tags: ["v*"]  # Publish on tags matching "v*", eg. "v1.0.0"
+  # push:
+  #   tags: ["v*"]  # Publish on tags matching "v*", eg. "v1.0.0"
   workflow_dispatch:
 
 jobs:
   tests:
     name: Tests
-    uses: glenn20/python-ci/.github/workflows/ci-tox.yaml@dev
+    uses: glenn20/python-ci/.github/workflows/ci-tox.yaml@v1
     with:
       os: '["ubuntu-latest"]'  # CI tests only run on linux
       python-version: '["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]'
@@ -46,7 +46,7 @@ jobs:
 
   github-release:
     name: Create GitHub release
-    uses: glenn20/python-ci/.github/workflows/release.yaml@dev
+    uses: glenn20/python-ci/.github/workflows/release.yaml@v1
     needs: publish-pypi
     permissions:
       contents: write  # IMPORTANT: mandatory for github release

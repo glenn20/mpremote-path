@@ -5,14 +5,14 @@ name: CI Tests (short)
 # - manually triggered from github Actions tab.
 
 on:
-  push:
-    branches-ignore: [main]
+  # push:
+  #   branches-ignore: [main]
   workflow_dispatch:
 
 jobs:
   tests:
     name: CI tests
-    uses: glenn20/python-ci/.github/workflows/ci-tox.yaml@dev
+    uses: glenn20/python-ci/.github/workflows/ci-tox.yaml@v1
     with:  # A short test matrix for fast testing of commits
       os: '["ubuntu-latest"]'  # CI tests only run on linux
       python-version: '["3.9", "3.13"]'

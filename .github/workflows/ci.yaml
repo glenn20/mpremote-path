@@ -1,0 +1,41 @@
+name: CI workflow for python projects
+
+# Run the code checks and CI pytest workflow on
+# - push to `main` or `dev` branches, or
+# - manually triggered from github Actions tab.
+
+# Build and publish to test.pypi on
+# - push to `main` branch.
+
+on:
+  push:
+    branches: [main, dev]
+    tags: ["v*"]  # Publish on tags matching "v*", eg. "v1.0.0"
+
+jobs:
+  tests:
+    if: ${{ github.event_name == 'push' && github.ref_name != 'main' }}
+    name: CI tests
+    uses: glenn20/python-ci/.github/workflows/ci-workflow.yaml@dev
+    with:
+      jobs: '["test", "build"]'
+      os: '["ubuntu-latest"]'
+      python-version: '["3.8", "3.13"]'
+
+  publish-test:
+    if: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+    name: CI tests and publish to test.pypi
+    uses: glenn20/python-ci/.github/workflows/ci-workflow.yaml@dev
+    with:
+      jobs: '["test", "build", "publish-test"]'
+      os: '["ubuntu-latest"]'
+      python-version: '["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]'
+
+  release:
+    if: ${{ github.event_name == 'tag' }}
+    name: CI test, publish and release
+    uses: glenn20/python-ci/.github/workflows/ci-workflow.yaml@dev
+    with:
+      jobs: '["test", "build", "publish-test", "publish-pypi", "release"]'
+      os: '["ubuntu-latest"]'
+      python-version: '["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]'
