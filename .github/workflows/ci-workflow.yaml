@@ -97,7 +97,7 @@ jobs:
   publish-test:
     if: ${{ contains(fromJson(inputs.jobs), 'publish-test') }}
     name: Publish to test.pypi
-    uses: .github/workflows/publish.yaml@dev
+    uses: ./.github/workflows/publish.yaml
     with:
       pypi: 'test.pypi'
     needs: build
@@ -107,7 +107,7 @@ jobs:
   publish:
     if: ${{ contains(fromJson(inputs.jobs), 'publish') }}
     name: Publish to pypi
-    uses: .github/workflows/publish.yaml@dev
+    uses: ./.github/workflows/publish.yaml
     with:
       pypi: 'upload.pypi'
     needs: publish-test
