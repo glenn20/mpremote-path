@@ -14,15 +14,19 @@ on:
 
 jobs:
   tests:
+    # Push to any non-main branch: run tests and build
     if: ${{ github.event_name == 'push' && github.ref_name != 'main' }}
     name: CI tests
     uses: ./.github/workflows/ci-workflow.yaml
     with:
       jobs: '["test", "build"]'
       os: '["ubuntu-latest"]'
-      python-version: '["3.8", "3.13"]'
+      python-version: '["3.9", "3.13"]'  # Check only oldest & newest python versions
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing!
 
   publish-test:
+    # Push to main branch: run tests, build and publish to test.pypi
     if: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
     name: CI tests and publish to test.pypi
     uses: ./.github/workflows/ci-workflow.yaml
@@ -30,8 +34,11 @@ jobs:
       jobs: '["test", "build", "publish-test"]'
       os: '["ubuntu-latest"]'
       python-version: '["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]'
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing!
 
   release:
+    # Push to version tag: run tests, build, publish and create a GitHub release
     if: ${{ github.event_name == 'tag' }}
     name: CI test, publish and release
     uses: ./.github/workflows/ci-workflow.yaml
@@ -39,3 +46,5 @@ jobs:
       jobs: '["test", "build", "publish-test", "publish-pypi", "release"]'
       os: '["ubuntu-latest"]'
       python-version: '["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]'
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing!
