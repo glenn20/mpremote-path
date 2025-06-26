@@ -1,0 +1,124 @@
+name: CI using tox
+
+#   A reusable github workflow to run python CI workflows, including static code
+#   checks, automated testing (using pytest or tox), package building,
+#   publishing to test.pypi.org and pypi.org, and creating a GitHub release.
+#
+#   The workflow elements to selected are specified in the `jobs` input. The
+#   default is to run the `test-tox` and `build` jobs. The CI workflow is
+#   configured in the tox-gh config (eg. pyproject.toml). See
+#   https://github.com/tox-dev/tox-gh.
+#
+#   Accepts the following inputs:
+#   - `jobs`: A json string containing the list of jobs to run. Default is
+#     `["test-tox", "build"]`. The available jobs are:
+#     - `code-check`: Run static code checks (using `mypy`, `ruff`, etc.).
+#     - `test-pytest`: Run tests using `pytest`.
+#     - `test-tox`: Run tests and code checks using `tox` (alias "test").
+#     - `build`: Build the python package.
+#     - `publish-test`: Publish the package to test.pypi.org.
+#     - `publish`: Publish the package to pypi.org.
+#     - `release`: Create a GitHub release.
+#   - `os`: A json string containing the list of operating systems on which to
+#     run tests. Default is `["ubuntu-latest", "windows-latest",
+#     "macos-latest"]`.
+#   - `python-version`: A json string containing the list of python versions on
+#     which to run tests. Default is `["3.9", "3.10", "3.11", "3.12", "3.13"]`.
+#
+#   Assumes the configurations for all tools (`mypy`, `uv`, `ruff`, `pytest`,
+#   ...) are fully specified in config files (eg `pyproject.toml`).
+#
+#   You should select either `test-tox` or `code-check`+`test-pytest`, but not
+#   both.
+#
+#   It is recommended to use the `test-tox` job, as it includes the code checks,
+#   and can be more easily customised in yourq pyproject.toml so that the same CI
+#   process runs on your local computer and on github.
+#
+#   All workflows use astral `uv` to execute actions wherever possible.
+
+on:
+  workflow_call:
+    inputs:
+      jobs:
+        description: >-
+          A json string containing the list of jobs to run. Default is
+          `["tests", "build"]`.
+        default: '["test-tox", "build"]'
+        type: string
+        required: false
+      os:
+        description: >-
+          A json string containing the list of operating systems on which to
+          run the test matrix.
+        default: '["ubuntu-latest", "windows-latest", "macos-latest"]'
+        type: string
+        required: false
+      python-version:
+        description: >-
+          A json string containing the list of python versions on
+          which to run the test matrix.
+        default: '["3.9", "3.10", "3.11", "3.12", "3.13"]'
+        type: string
+        required: false
+
+jobs:
+  code-check:
+    if: ${{ contains(fromJson(inputs.jobs), 'code-check') }}
+    name: Run static code checks
+    uses: glenn20/python-ci/.github/workflows/code-check.yaml@dev
+
+  test-pytest:
+    if: ${{ contains(fromJson(inputs.jobs), 'test-pytest') }}
+    name: Run tests using pytest
+    uses: glenn20/python-ci/.github/workflows/test-pytest.yaml@dev
+    with:
+      os: ${{ inputs.os }}
+      python-version: ${{ inputs.python-version }}
+
+  test-tox:
+    if: ${{ contains(fromJson(inputs.jobs), 'test-tox') || contains(fromJson(inputs.jobs), 'test') }}
+    name: Run tests and code checks using tox
+    uses: glenn20/python-ci/.github/workflows/test-tox.yaml@dev
+    with:
+      os: ${{ inputs.os }}
+      python-version: ${{ inputs.python-version }}
+
+  build:
+    if: ${{ contains(fromJson(inputs.jobs), 'build') }}
+    name: Build python package
+    uses: glenn20/python-ci/.github/workflows/build.yaml@dev
+
+  # The publish workflows must be located in your project repository, not in the
+  # python-ci repository, so that they can access the secrets needed to publish
+  # to test.pypi.org and pypi.org. Copy the `publish.yaml` workflow from
+  # `glenn20/python-ci/examples/publish.yaml` to your project's
+  # `.github/workflows` directory.
+  publish-test:
+    if: ${{ contains(fromJson(inputs.jobs), 'publish-test') }}
+    name: Publish to test.pypi
+    uses: .github/workflows/publish.yaml
+    with:
+      pypi: 'test.pypi'
+    needs: build
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing!
+
+  publish:
+    if: ${{ contains(fromJson(inputs.jobs), 'publish') }}
+    name: Publish to pypi
+    uses: .github/workflows/publish.yaml
+    with:
+      pypi: 'upload.pypi'
+    needs: publish-test
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing!
+
+  release:
+    if: ${{ contains(fromJson(inputs.jobs), 'release') }}
+    name: Create GitHub release
+    uses: glenn20/python-ci/.github/workflows/github-release.yaml@dev
+    needs: publish
+    permissions:
+      contents: write  # IMPORTANT: mandatory for github release
+      id-token: write  # IMPORTANT: mandatory for github release

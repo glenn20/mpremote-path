@@ -16,7 +16,7 @@ jobs:
   tests:
     if: ${{ github.event_name == 'push' && github.ref_name != 'main' }}
     name: CI tests
-    uses: glenn20/python-ci/.github/workflows/ci-workflow.yaml@dev
+    uses: .github/workflows/ci-workflow.yaml
     with:
       jobs: '["test", "build"]'
       os: '["ubuntu-latest"]'
@@ -25,7 +25,7 @@ jobs:
   publish-test:
     if: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
     name: CI tests and publish to test.pypi
-    uses: glenn20/python-ci/.github/workflows/ci-workflow.yaml@dev
+    uses: .github/workflows/ci-workflow.yaml
     with:
       jobs: '["test", "build", "publish-test"]'
       os: '["ubuntu-latest"]'
@@ -34,7 +34,7 @@ jobs:
   release:
     if: ${{ github.event_name == 'tag' }}
     name: CI test, publish and release
-    uses: glenn20/python-ci/.github/workflows/ci-workflow.yaml@dev
+    uses: .github/workflows/ci-workflow.yaml
     with:
       jobs: '["test", "build", "publish-test", "publish-pypi", "release"]'
       os: '["ubuntu-latest"]'
