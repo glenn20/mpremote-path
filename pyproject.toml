@@ -83,7 +83,8 @@ run.omit = ["_version.py"]
 report.skip_covered = false
 append = true
 
-[tool.tox.gh.python]  # For Github Actions workflow - see
+# For Github Actions workflow - see https://github.com/tox-dev/tox-gh
+[tool.tox.gh.python]
 "3.13" = ["clean", "typing", "lint", "format", "3.13"]
 "3.12" = ["3.12"]
 "3.11" = ["3.11"]
@@ -111,7 +112,6 @@ dependency_groups = ["test"]  # Everything we need to run the tox tests
 labels = ["test"]
 package = "editable"  # "editable" runs a bit faster then "wheel"
 runner = "uv-venv-runner"  # We love uv
-passenv = ["GITHUB_ACTIONS"]  # So conftest.py knows we are running in github actions
 
 [tool.tox.env.3.13]
 # Run coverage tests only on the latest python version
