@@ -1,4 +1,4 @@
-name: CI workflow for python projects
+name: CI workflow
 
 # Run the CI test workflow of jobs which includes:
 # - `test`: Run tests (including code checks) using `tox`.
@@ -6,6 +6,19 @@ name: CI workflow for python projects
 # - `publish-test`: Publish the package to test.pypi.org.
 # - `publish`: Publish the package to pypi.org (runs `publish-test`).
 # - `release`: Create a GitHub release.
+#
+# Requirements for trusted publishing of python packages to pypi.org:
+# 1. For trusted publishing, the publishing workflow must be in the project
+#    repository, so copy this workflow file to `.github/workflows/ci.yaml`
+#    in your repository.
+# 2. Create a github Environment in your repo called `publish-pypi`
+#    (Settings->Environments->New Environment) (Optional).
+# 3. Add the name of this workflow file (ci.yaml) as a "trusted
+#    publisher" on your pypi and test.pypi project pages (add the name of the
+#    relevant Environment for additional access control).
+# 4. Call this workflow from a parent workflow with the `pypi` input set to
+#    "upload.pypi" or "test.pypi" (default).
+
 
 # Configure the workflows here. Each environment variable name should be a
 # wildcard matching the
@@ -27,7 +40,7 @@ env:
     jobs=["test", "build"]
     python-version=["3.9", "3.13"]
     os=["ubuntu-latest"]
-  on-workflow_dispatch-*: |  # Manual trigger of the workflow
+  on-workflow_dispatch-branch-*: |  # Manual trigger of the workflow
     jobs=["test", "build"]
     python-version=["3.9", "3.13"]
     os=["ubuntu-latest"]
@@ -36,6 +49,9 @@ on:
   push:
     branches: ["**"]  # Push commits to any branch
     tags: ["v[0-9]*"]  # Publish on tags matching "v*", eg. "v1.0.0"
+
+####### Edit above this line - leave the rest of the workflow intact.
+
   workflow_dispatch:  # Allow manual triggering of the workflow
 
 jobs:
