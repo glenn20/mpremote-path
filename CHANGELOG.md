@@ -1,5 +1,14 @@
 # Changelog
 
+## What's Changed  ([unreleased])
+
+- ci: Add support for `git-cliff` to manage changelog.- ([c3386cf])
+- Fix CI status links in README for new CI workflow.- ([ad4b6a0])
+
+[unreleased]: https://github.com/glenn20/mpremote-path/compare/v0.1.8..HEAD
+[c3386cf]: https://github.com/glenn20/mpremote-path/commit/c3386cf5c2e118d0104b836a44c42eea131ccea4
+[ad4b6a0]: https://github.com/glenn20/mpremote-path/commit/ad4b6a0d573bf7c7b3f3b29b287e942afaa37f52
+
 ## What's Changed  in [v0.1.8]
 
 - Refactor github CI workflows- ([a7c4655])
