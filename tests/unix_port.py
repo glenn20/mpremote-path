@@ -33,7 +33,7 @@ def run_pty_bridge(
     cwd: Optional[Path] = None,
     use_socat: bool = False,
 ) -> Generator[Path, None, None]:
-    """Run the command behind a PTY to emulate a serial port.
+    """Run `command` behind a PTY to emulate a serial port.
 
     Runs the command and returns the name of a PTY to use as the virtual serial
     port for communication with the command. Input and output is relayed between
